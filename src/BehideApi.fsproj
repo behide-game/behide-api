@@ -1,0 +1,27 @@
+﻿
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net7.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="./Serialization/GuidSerializer.fs" />
+    <Compile Include="./Serialization/SingleUnionTypeSerializer.fs" />
+    <Compile Include="./Serialization/DiscriminatedUnionSerializer.fs" />
+    <Compile Include="./Serialization/SerializerProvider.fs" />
+
+    <Compile Include="./Helpers/Falco.fs" />
+
+
+    <Compile Include="Common.fs" />
+
+    <Compile Include="./Domain/Types.fs" />
+    <Compile Include="./Database.fs" />
+
+    <Compile Include="./API/Common.fs" />
+    <Compile Include="./API/Authentication.fs" />
+
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+  <Import Project="..\.paket\Paket.Restore.targets" />
+</Project>
