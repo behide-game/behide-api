@@ -1,4 +1,4 @@
-module BehideApi.Database
+module BehideApi.Repository.Database
 
 open BehideApi.Types
 open BehideApi.Common
@@ -17,7 +17,7 @@ let private database = mongo.GetDatabase databaseName
 
 module Users =
     let private collectionName = "users"
-    let collection = database.GetCollection<Types.User> collectionName
+    let collection = database.GetCollection<User> collectionName
 
     let insert = collection.InsertOneAsync
 
@@ -30,8 +30,8 @@ module Users =
         |> Task.bind (fun users -> users.ToListAsync())
         |> Task.map Seq.toList
 
-    let findByUserEmail (Email email) : Task<User list> =
-        let filter = {| ``AuthConnections.Email.Email`` = email |}
+    let findByUserEmail (email: Email) : Task<User list> =
+        let filter = {| ``AuthConnections.Email.Email`` = (email |> Email.raw) |}
 
         filter.ToBsonDocument()
         |> BsonDocumentFilterDefinition

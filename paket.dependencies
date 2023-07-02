@@ -9,4 +9,5 @@ nuget Microsoft.AspNetCore.Authentication.JwtBearer
 nuget mongocsharpdriver
 nuget MongoDB.FSharp
 nuget NamelessInteractive.FSharp.MongoDB
+nuget NRedisStack
 nuget Thoth.Json.Net

@@ -16,10 +16,13 @@
     <Compile Include="Common.fs" />
 
     <Compile Include="./Domain/Types.fs" />
-    <Compile Include="./Database.fs" />
+    <Compile Include="./Repository/Database.fs" />
+    <Compile Include="./Repository/Cache.fs" />
+    <Compile Include="./JWT.fs" />
 
     <Compile Include="./API/Common.fs" />
     <Compile Include="./API/Authentication.fs" />
+    <Compile Include="./API/User.fs" />
 
     <Compile Include="Program.fs" />
   </ItemGroup>

@@ -1,6 +1,7 @@
 ﻿module BehideApi.Program
 
 open BehideApi.Common
+open BehideApi.Common.Config.Auth
 open Falco.HostBuilder
 open NamelessInteractive.FSharp.MongoDB
 
@@ -8,6 +9,7 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
 open Microsoft.IdentityModel.Tokens
+open Microsoft.AspNetCore.Authentication.JwtBearer
 
 
 [<EntryPoint>]
@@ -34,9 +36,7 @@ let main args =
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = builder.Configuration["jwt:issuer"],
                         ValidAudience = builder.Configuration["jwt:audience"],
-                        IssuerSigningKey = new SymmetricSecurityKey(
-                            System.Text.Encoding.UTF8.GetBytes(Config.Auth.JWT.signingKey)
-                        )
+                        IssuerSigningKey = JWT.securityKey
                     )
                 )
                 .AddDiscord(fun options ->
@@ -60,6 +60,7 @@ let main args =
         use_authentication
         endpoints [
             yield! API.Authentication.endpoints
+            yield! API.User.endpoints
         ]
     }
 

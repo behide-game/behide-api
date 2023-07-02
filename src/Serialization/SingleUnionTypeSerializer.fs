@@ -8,10 +8,7 @@ open MongoDB.Bson.Serialization.Serializers
 type SingleUnionTypeSerializer<'t>() =
     inherit SerializerBase<'t>()
 
-    let case =
-        typeof<'t>
-        |> FSharpType.GetUnionCases
-        |> Array.head
+    let case = FSharpType.GetUnionCases(typeof<'t>, true) |> Array.head
 
     let deserBy context args t =
         BsonSerializer.LookupSerializer(t).Deserialize(context, args)

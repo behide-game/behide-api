@@ -34,3 +34,11 @@ module Response =
     let unauthorized error : HttpHandler =
         Response.withStatusCode (HttpStatusCode.Unauthorized |> int)
         >> Response.ofPlainText error
+
+    let forbidden error : HttpHandler =
+        Response.withStatusCode (HttpStatusCode.Forbidden |> int)
+        >> Response.ofPlainText error
+
+    let notFound error : HttpHandler =
+        Response.withStatusCode (HttpStatusCode.NotFound |> int)
+        >> Response.ofPlainText error

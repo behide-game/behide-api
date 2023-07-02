@@ -2,11 +2,8 @@ module BehideApi.API.Authentication
 
 open System
 open System.Web
-open System.Text
 open System.Security.Claims
-open System.IdentityModel.Tokens.Jwt
 open Microsoft.AspNetCore.Http
-open Microsoft.IdentityModel.Tokens
 
 open Falco
 open Falco.Routing
@@ -15,42 +12,10 @@ open Falco.Helpers
 
 open BehideApi
 open BehideApi.Types
-open BehideApi.Common
+open BehideApi.Repository
 open BehideApi.API.Common
 
 open FsToolkit.ErrorHandling
-
-
-let createJwtToken claims =
-    let tokenDuration = TimeSpan.FromDays 1
-
-    let credentials = SigningCredentials(
-        Config.Auth.JWT.signingKey
-        |> Encoding.UTF8.GetBytes
-        |> SymmetricSecurityKey,
-        SecurityAlgorithms.HmacSha256
-    )
-
-    JwtSecurityToken(
-        issuer = "https://behide.netlify.app",
-        audience = "https://behide.netlify.app",
-        claims = claims,
-        notBefore = DateTime.Now,
-        expires = DateTime.Now + tokenDuration,
-        signingCredentials = credentials
-    )
-    |> JwtSecurityTokenHandler().WriteToken
-
-let createJwtTokenForUser user =
-    let userId = user.Id |> (fun (UserId guid) -> guid.ToString())
-    let email = user.AuthConnections[0].Email |> (fun (Email str) -> str)
-
-    [ ClaimTypes.NameIdentifier, userId
-      ClaimTypes.Name, user.Name
-      ClaimTypes.Email, email ]
-    |> Seq.map Claim
-    |> createJwtToken
-
 
 
 let connectWithProviderAndRedirect (redirectUrl: string) (ctx: HttpContext) = taskResult {
@@ -96,7 +61,7 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
 
     let! email =
         Auth.getClaimValue ClaimTypes.Email ctx |> function
-        | Some email -> email |> Email |> Ok
+        | Some email -> email |> Email.create |> Ok
         | None -> Error (Response.unauthorized "Cannot find email claim" ctx)
 
     let! nameIdentifier =
@@ -107,12 +72,15 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
 
     // Work...
     let finalRedirectUri = new UriBuilder(redirectUri)
+    let finalRedirectQuery = HttpUtility.ParseQueryString(finalRedirectUri.Query)
 
     let! usersWithSameEmail = Database.Users.findByUserEmail email
-    match usersWithSameEmail with
-    | [] ->
+    let! usersWithSameNameIdentifier = Database.Users.findByUserNameIdentifier nameIdentifier
+    printfn "%A %A" usersWithSameNameIdentifier.Length usersWithSameEmail.Length
+    match usersWithSameNameIdentifier, usersWithSameEmail with
+    | [], [] ->
         let user: User = {
-            Id = Guid.NewGuid() |> UserId
+            Id = UserId.create()
             Name = "Temp name" // TODO -> Add a default random name
             AuthConnections = {
                 Email = email
@@ -124,28 +92,33 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
         do! user |> Database.Users.insert
 
         // Generate JWT token and it to redirectUri's query
-        let token = createJwtTokenForUser user
+        let! (accessToken, refreshToken) =
+            JWT.generateTokensForUser user
+            |> TaskResult.mapError (sprintf "Failed to generate jwt token: %s")
+            |> TaskResult.mapError (fun error -> Response.internalServerError error ctx)
 
-        let query = HttpUtility.ParseQueryString(finalRedirectUri.Query)
-        query.Add("token", token)
-        finalRedirectUri.Query <- query.ToString()
+        finalRedirectQuery.Add("access_token", accessToken)
+        finalRedirectQuery.Add("refresh_token", refreshToken)
 
         ()
-    | [ _user ] -> finalRedirectUri.Path <- finalRedirectUri.Path + "/user-already-exists"
-    | _ -> finalRedirectUri.Path <- finalRedirectUri.Path + "/many-users-already-exists"
+    | [ _user ], _ -> finalRedirectQuery.Add("failed", "user-already-exists")
+    | [], [ _user ] -> finalRedirectQuery.Add("failed", "user-with-same-email-exists")
+    | _ -> finalRedirectQuery.Add("failed", "many-users-already-exist")
 
-    return Response.redirectPermanently finalRedirectUri.Uri.AbsoluteUri ctx
+    finalRedirectUri.Query <- finalRedirectQuery.ToString()
+
+    return Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri ctx
 }
 
 
 let login (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
-    let! finalRedirectUri =
+    let! escapedFinalRedirectUri =
         query.TryGetString "redirect_uri" |> function
         | Some uri -> uri |> HttpUtility.UrlEncode |> Ok
         | None -> Error (Response.badRequest "Cannot find redirect_uri query" ctx)
 
-    let redirectUri = sprintf "/auth/login/complete/%s" finalRedirectUri
+    let redirectUri = sprintf "/auth/login/complete/%s" escapedFinalRedirectUri
 
     return connectWithProviderAndRedirect redirectUri ctx |> TaskResult.eitherId
 }
@@ -162,18 +135,26 @@ let completeLogin (ctx: HttpContext) = taskResult {
         | Some nameId -> Ok nameId
         | None -> Error (Response.unauthorized "Cannot find name identifier claim" ctx)
 
-    let! user = Database.Users.findByUserNameIdentifier nameIdentifier |> Task.map List.head
+    let! user =
+        Database.Users.findByUserNameIdentifier nameIdentifier
+        |> Task.map List.tryHead
+        |> Task.map (function Some user -> Ok user | None -> Error "User not found, try to sign up")
+        |> TaskResult.mapError (fun error -> Response.notFound error ctx)
 
     // Generate JWT token and it to redirectUri's query
     let finalRedirectUri = new UriBuilder(redirectUri)
 
-    let token = createJwtTokenForUser user
+    let! (accessToken, refreshToken) =
+        JWT.generateTokensForUser user
+        |> TaskResult.mapError (sprintf "Failed to generate jwt token: %s")
+        |> TaskResult.mapError (fun error -> Response.internalServerError error ctx)
 
     let query = HttpUtility.ParseQueryString(finalRedirectUri.Query)
-    query.Add("token", token)
+    query.Add("access_token", accessToken)
+    query.Add("refresh_token", refreshToken)
     finalRedirectUri.Query <- query.ToString()
 
-    return Response.redirectPermanently finalRedirectUri.Uri.AbsoluteUri ctx
+    return Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri ctx
 }
 
 let endpoints = [
