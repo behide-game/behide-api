@@ -19,9 +19,9 @@ open BehideApi.API.Common.Auth
 //     Auth
 // }
 
-let handler (principal: ClaimsPrincipal) (ctx: HttpContext) =
+let handler (ctx: HttpContext) =
     taskResult {
-        return Response.ofPlainText ("Hello " + principal.Identity.Name) ctx
+        return Response.ofPlainText ("Hello " + ctx.User.Identity.Name) ctx
     } |> TaskResult.eitherId
 
 let endpoints = [

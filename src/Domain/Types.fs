@@ -4,7 +4,7 @@ open System
 
 type Email = Email of string
 module Email =
-    let create rawEmail = Email rawEmail
+    let parse rawEmail = Email rawEmail
     let raw (Email email) = email
 
 [<RequireQualifiedAccess>]

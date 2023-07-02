@@ -1,7 +1,12 @@
 module BehideApi.API.Common
 
+open BehideApi.Types
+open BehideApi.Repository
+
 open System.Text
+open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
+open FsToolkit.ErrorHandling
 
 let bodyJsonOptions =
     Json.JsonSerializerOptions(
@@ -9,23 +14,23 @@ let bodyJsonOptions =
         PropertyNameCaseInsensitive = true
     )
 
-module FsToolkit =
-    module ErrorHandling =
-        module TaskResult =
-            open System.Threading.Tasks
-            open FsToolkit.ErrorHandling
-
-            let eitherId: Task<Result<Task, Task>> -> Task = Task.bind (Result.either id id >> Task.ofUnit) >> fun task -> task :> Task
+module Handler =
+    let fromTRHandler (handler: HttpContext -> TaskResult<Task, (HttpContext -> Task)>) ctx =
+        task {
+            match! handler ctx with
+            | Ok task -> return! task
+            | Error handler -> return! handler ctx
+        } :> Task
 
 module Auth =
     open Falco
+    open Falco.Helpers
     open Falco.Security
     open System
-    open System.Threading.Tasks
     open System.Security.Claims
     open Microsoft.AspNetCore.Authentication.JwtBearer
 
-    let requireAuth (handleOk: ClaimsPrincipal -> HttpHandler) (ctx: HttpContext) =
+    let requireAuth (handleOk: HttpHandler) (ctx: HttpContext) =
         let handleError (failure: Exception) : HttpHandler =
             Response.withStatusCode StatusCodes.Status401Unauthorized
             >> Response.ofPlainText (sprintf "Unauthorized: %s" failure.Message)
@@ -34,5 +39,26 @@ module Auth =
             let! res = Auth.authenticate JwtBearerDefaults.AuthenticationScheme ctx
             match res.Succeeded with
             | false -> return! handleError res.Failure ctx
-            | true -> return! handleOk res.Principal ctx
+            | true -> return! handleOk ctx
         } :> Task
+
+    let getBehideUser (ctx: HttpContext) =
+        taskResult {
+            let parseUserId =
+                UserId.tryParse
+                >> Result.ofOption (Response.unauthorized "Unauthorized, failed to parse name identifier")
+
+            let! userId =
+                ctx
+                |> Auth.getClaimValue ClaimTypes.NameIdentifier
+                |> Result.ofOption (Response.unauthorized "Unauthorized")
+                |> Result.bind parseUserId
+
+            let! user =
+                userId
+                |> Database.Users.findByUserId
+                |> Task.map List.tryHead
+                |> TaskResult.ofOption (Response.notFound "Cannot find user")
+
+            return user
+        }

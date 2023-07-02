@@ -11,7 +11,6 @@ open System.Security.Claims
 open Microsoft.IdentityModel.Tokens
 open FsToolkit.ErrorHandling
 
-
 let tokenDuration = TimeSpan.FromDays 1
 
 let securityKey =
@@ -50,7 +49,18 @@ let generateTokensForUser user = taskResult {
     let jwt = createJwtTokenForUser user
     let refreshToken = Guid.NewGuid().ToString()
 
+    do! Cache.setUserAccessToken user.Id jwt
     do! Cache.setUserRefreshToken user.Id refreshToken
 
     return (jwt, refreshToken)
+}
+
+let refreshTokenForUser user accessToken refreshToken = taskResult {
+    let! dbAccessToken = Cache.getUserAccessToken user.Id |> TaskResult.ofOption "Failed to retrieve access token"
+    let! dbRefreshToken = Cache.getUserRefreshToken user.Id |> TaskResult.ofOption "Failed to retrieve refresh token"
+
+    do! accessToken = dbAccessToken |> Result.requireTrue "Invalid access token"
+    do! refreshToken = dbRefreshToken |> Result.requireTrue "Invalid refresh token"
+
+    return! generateTokensForUser user
 }

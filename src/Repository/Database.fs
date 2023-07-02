@@ -22,7 +22,7 @@ module Users =
     let insert = collection.InsertOneAsync
 
     let findByUserId (userId: UserId) : Task<User list> =
-        let filter = {| Id = userId |}
+        let filter = {| ``_id.UserId`` = UserId.raw(userId).ToByteArray() |}
 
         filter.ToBsonDocument()
         |> BsonDocumentFilterDefinition

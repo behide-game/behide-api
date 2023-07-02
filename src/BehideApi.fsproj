@@ -10,6 +10,7 @@
     <Compile Include="./Serialization/DiscriminatedUnionSerializer.fs" />
     <Compile Include="./Serialization/SerializerProvider.fs" />
 
+    <Compile Include="./Helpers/FsToolkit.ErrorHandling.fs" />
     <Compile Include="./Helpers/Falco.fs" />
 
 

@@ -25,6 +25,18 @@ let private read (key: string) =
     )
 
 
+let getUserAccessToken (userId: UserId) =
+    userId
+    |> UserId.rawString
+    |> sprintf "%s:access_token"
+    |> read
+
+let setUserAccessToken (userId: UserId) (accessToken: string) =
+    write
+        (userId |> UserId.rawString |> sprintf "%s:access_token")
+        accessToken
+
+
 let getUserRefreshToken (userId: UserId) =
     userId
     |> UserId.rawString

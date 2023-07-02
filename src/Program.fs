@@ -1,7 +1,6 @@
 ﻿module BehideApi.Program
 
 open BehideApi.Common
-open BehideApi.Common.Config.Auth
 open Falco.HostBuilder
 open NamelessInteractive.FSharp.MongoDB
 
@@ -9,7 +8,6 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
 open Microsoft.IdentityModel.Tokens
-open Microsoft.AspNetCore.Authentication.JwtBearer
 
 
 [<EntryPoint>]
