@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BehideApi", "src\BehideApi.fsproj", "{963DF141-6A05-4128-96AC-9FF46720C838}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BehideApi.Tests", "src-tests\BehideApi.Tests.fsproj", "{350E66B9-29DA-4996-AB59-4A03FE147F15}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{963DF141-6A05-4128-96AC-9FF46720C838}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{963DF141-6A05-4128-96AC-9FF46720C838}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{963DF141-6A05-4128-96AC-9FF46720C838}.Release|Any CPU.Build.0 = Release|Any CPU
+		{350E66B9-29DA-4996-AB59-4A03FE147F15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{350E66B9-29DA-4996-AB59-4A03FE147F15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{350E66B9-29DA-4996-AB59-4A03FE147F15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{350E66B9-29DA-4996-AB59-4A03FE147F15}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

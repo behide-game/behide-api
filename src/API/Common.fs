@@ -27,19 +27,24 @@ module Auth =
     open Falco
     open Falco.Helpers
     open Falco.Security
-    open System
     open System.Security.Claims
     open Microsoft.AspNetCore.Authentication.JwtBearer
 
     let requireAuth (handleOk: HttpHandler) (ctx: HttpContext) =
-        let handleError (failure: Exception) : HttpHandler =
+        let handleError (failure: exn option) : HttpHandler =
+            let message =
+                failure
+                |> Option.map (fun f -> f.Message)
+                |> Option.map (sprintf "Unauthorized: %s")
+                |> Option.defaultValue "Unauthorized"
+
             Response.withStatusCode StatusCodes.Status401Unauthorized
-            >> Response.ofPlainText (sprintf "Unauthorized: %s" failure.Message)
+            >> Response.ofPlainText message
 
         task {
             let! res = Auth.authenticate JwtBearerDefaults.AuthenticationScheme ctx
             match res.Succeeded with
-            | false -> return! handleError res.Failure ctx
+            | false -> return! handleError (res.Failure |> Option.ofNull) ctx
             | true ->
                 ctx.User <- res.Principal
                 return! handleOk ctx

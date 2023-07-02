@@ -1,6 +1,10 @@
 source https://api.nuget.org/v3/index.json
 
 storage: symlink
+
+group Build
+source https://api.nuget.org/v3/index.json
+
 nuget AspNet.Security.OAuth.Discord
 nuget Falco
 nuget FsToolkit.ErrorHandling.TaskResult
@@ -11,3 +15,10 @@ nuget MongoDB.FSharp
 nuget NamelessInteractive.FSharp.MongoDB
 nuget NRedisStack
 nuget Thoth.Json.Net
+
+
+group Tests
+source https://api.nuget.org/v3/index.json
+
+nuget Expecto
+nuget Microsoft.AspNetCore.TestHost

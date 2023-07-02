@@ -1,3 +1,4 @@
+group Build
 Falco
 mongocsharpdriver
 MongoDB.FSharp

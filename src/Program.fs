@@ -1,14 +1,20 @@
 ﻿module BehideApi.Program
 
 open BehideApi.Common
-open Falco.HostBuilder
 open NamelessInteractive.FSharp.MongoDB
 
-open Microsoft.Extensions.DependencyInjection
+open Falco.HostBuilder
+
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
+open Microsoft.Extensions.DependencyInjection
 open Microsoft.IdentityModel.Tokens
 
+
+let allEndpoints = [
+    yield! API.Authentication.endpoints
+    yield! API.User.endpoints
+]
 
 [<EntryPoint>]
 let main args =
@@ -56,10 +62,7 @@ let main args =
 
         use_authorization
         use_authentication
-        endpoints [
-            yield! API.Authentication.endpoints
-            yield! API.User.endpoints
-        ]
+        endpoints allEndpoints
     }
 
     0
