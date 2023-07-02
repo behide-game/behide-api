@@ -8,10 +8,11 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open FsToolkit.ErrorHandling
 
-let bodyJsonOptions =
+let jsonOptions =
     Json.JsonSerializerOptions(
         AllowTrailingCommas = true,
-        PropertyNameCaseInsensitive = true
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = Json.JsonNamingPolicy.CamelCase
     )
 
 module Handler =
@@ -39,7 +40,9 @@ module Auth =
             let! res = Auth.authenticate JwtBearerDefaults.AuthenticationScheme ctx
             match res.Succeeded with
             | false -> return! handleError res.Failure ctx
-            | true -> return! handleOk ctx
+            | true ->
+                ctx.User <- res.Principal
+                return! handleOk ctx
         } :> Task
 
     let getBehideUser (ctx: HttpContext) =

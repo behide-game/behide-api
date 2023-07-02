@@ -13,6 +13,11 @@ type AuthProvider =
     | Google
     | Microsoft
 
+    static member ToString = function
+        | Discord -> "discord"
+        | Google -> "google"
+        | Microsoft -> "microsoft"
+
 type AuthConnection = {
     NameIdentifier: string
     Email: Email
