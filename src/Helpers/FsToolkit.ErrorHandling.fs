@@ -15,3 +15,12 @@ module TaskResult =
     }
 
     let ofOption error = Task.map (Result.ofOption error)
+
+    let simpleCatch f task =
+        task
+        |> Task.catch
+        |> Task.map (
+            function
+            | Choice1Of2 v -> Ok v
+            | Choice2Of2 ex -> Error (f ex)
+        )

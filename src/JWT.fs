@@ -11,6 +11,8 @@ open System.Security.Claims
 open Microsoft.IdentityModel.Tokens
 open FsToolkit.ErrorHandling
 
+
+// JWT Generation
 let tokenDuration = TimeSpan.FromDays 1
 
 let securityKey =
@@ -45,22 +47,32 @@ let createJwtTokenForUser user =
     |> createJwtToken
 
 
+// Repository
+let setUserTokens user accessToken refreshToken =
+    let token: Auth.Token =
+        { UserId = user.Id
+          AccessToken = accessToken
+          RefreshToken = refreshToken }
+
+    token |> Database.Tokens.upsert
+
+let getUserTokens (user: User) = user.Id |> Database.Tokens.findByUserId
+
+
+// JWT Generation + Repository
 let generateTokensForUser user = taskResult {
     let jwt = createJwtTokenForUser user
     let refreshToken = Guid.NewGuid().ToString()
 
-    do! Cache.setUserAccessToken user.Id jwt
-    do! Cache.setUserRefreshToken user.Id refreshToken
-
+    do! setUserTokens user jwt refreshToken
     return (jwt, refreshToken)
 }
 
 let refreshTokenForUser user accessToken refreshToken = taskResult {
-    let! dbAccessToken = Cache.getUserAccessToken user.Id |> TaskResult.ofOption "Failed to retrieve access token"
-    let! dbRefreshToken = Cache.getUserRefreshToken user.Id |> TaskResult.ofOption "Failed to retrieve refresh token"
+    let! tokens = getUserTokens user |> TaskResult.bindRequireSome "Failed to retrieve user tokens"
 
-    do! accessToken = dbAccessToken |> Result.requireTrue "Invalid access token"
-    do! refreshToken = dbRefreshToken |> Result.requireTrue "Invalid refresh token"
+    do! accessToken = tokens.AccessToken |> Result.requireTrue "Invalid access token"
+    do! refreshToken = tokens.RefreshToken |> Result.requireTrue "Invalid refresh token"
 
     return! generateTokensForUser user
 }

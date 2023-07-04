@@ -34,9 +34,17 @@ module UserId =
     let create () = Guid.NewGuid() |> UserId
     let raw (UserId guid) = guid
     let rawString (UserId guid) = guid.ToString()
+    let rawBytes (UserId guid) = guid.ToByteArray()
 
 type User = {
     Id: UserId
     Name: string
     AuthConnections: AuthConnection []
 }
+
+module Auth =
+    type Token = {
+        UserId: UserId
+        AccessToken: string
+        RefreshToken: string
+    }

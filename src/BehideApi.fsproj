@@ -5,10 +5,10 @@
     <NoWarn>NU1701</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="./Serialization/GuidSerializer.fs" />
-    <Compile Include="./Serialization/SingleUnionTypeSerializer.fs" />
-    <Compile Include="./Serialization/DiscriminatedUnionSerializer.fs" />
-    <Compile Include="./Serialization/SerializerProvider.fs" />
+    <Compile Include="./Repository/Serialization/GuidSerializer.fs" />
+    <Compile Include="./Repository/Serialization/SingleUnionTypeSerializer.fs" />
+    <Compile Include="./Repository/Serialization/DiscriminatedUnionSerializer.fs" />
+    <Compile Include="./Repository/Serialization/SerializerProvider.fs" />
 
     <Compile Include="./Helpers/FsToolkit.ErrorHandling.fs" />
     <Compile Include="./Helpers/Falco.fs" />
@@ -18,7 +18,6 @@
 
     <Compile Include="./Domain/Types.fs" />
     <Compile Include="./Repository/Database.fs" />
-    <Compile Include="./Repository/Cache.fs" />
     <Compile Include="./JWT.fs" />
 
     <Compile Include="./API/Common.fs" />
