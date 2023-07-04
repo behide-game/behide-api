@@ -195,11 +195,13 @@ let refreshToken (ctx: HttpContext) = taskResult {
         |> Task.map List.tryHead
         |> TaskResult.ofOption (Response.notFound "User not found")
 
-    let! tokens =
+    let! (accessToken, refreshToken) =
         JWT.refreshTokenForUser user accessToken refreshToken
         |> TaskResult.mapError (fun error -> Response.internalServerError error)
 
-    return Response.ofJson ({| accessToken = fst tokens; refreshToken = snd tokens |}) ctx
+    let response = DTO.Auth.RefreshToken.createResponse accessToken refreshToken
+
+    return Response.ofJson response ctx
 }
 
 
@@ -216,5 +218,5 @@ let endpoints = [
             (completeLogin |> Handler.fromTRHandler)
             (Response.unauthorized "Unauthorized"))
 
-    get "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
+    post "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
 ]

@@ -1,0 +1,9 @@
+{
+  "schema": "./openapi.json",
+  "project": "BehideApi.OpenAPI",
+  "output": "./src/OpenAPI",
+  "target": "fsharp",
+  "synchronous": false,
+  "asyncReturnType": "task",
+  "resolveReferences": true
+}

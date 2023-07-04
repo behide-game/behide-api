@@ -25,6 +25,7 @@ jobs:
         dotnet-version: 7.0.x
 
     - run: dotnet tool restore
+    - run: dotnet hawaii
     - run: dotnet paket restore
     - run: dotnet restore
 

@@ -1,0 +1,87 @@
+{
+  "openapi": "3.0.2",
+  "info": {
+    "title": "Behide API",
+    "version": "1.0"
+  },
+  "servers": [
+    {
+      "url": "https://api.behide.titaye.dev/"
+    }
+  ],
+  "paths": {
+    "/auth/refresh-token": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["accessToken", "refreshToken"],
+                  "properties": {
+                    "accessToken": { "type": "string" },
+                    "refreshToken": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/text": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "No access token in query": { "value": "Cannot find access_token in query" },
+                  "No refresh token in query": { "value": "Cannot find refresh_token in query" },
+                  "Invalid access token": { "value": "Failed to read access token" }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/text": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "Cannot find name identifier claim in jwt token": { "value": "Unauthorized" },
+                  "Failed to parse name identifier claim in jwt token": { "value": "Unauthorized, failed to parse name identifier" }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/text": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "Cannot find the user associated with the jwt token": { "value": "User not found" }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error (failed to generate a new token)",
+            "content": {
+              "application/text": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
