@@ -40,7 +40,7 @@ let main args =
                         ValidateIssuerSigningKey = true,
                         ValidIssuer = builder.Configuration["jwt:issuer"],
                         ValidAudience = builder.Configuration["jwt:audience"],
-                        IssuerSigningKey = JWT.securityKey
+                        IssuerSigningKey = Config.Auth.JWT.securityKey
                     )
                 )
                 .AddDiscord(fun options ->

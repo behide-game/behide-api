@@ -16,6 +16,7 @@ let private databaseName = "Behide"
 let private database = mongo.GetDatabase databaseName
 
 module Users =
+    open MongoDB.Driver
     let private collectionName = "users"
     let collection = database.GetCollection<User> collectionName
 
@@ -48,27 +49,20 @@ module Users =
         |> Task.bind (fun users -> users.ToListAsync())
         |> Task.map Seq.toList
 
-module Tokens =
-    let private collectionName = "tokens"
-    let private collection = database.GetCollection<Auth.Token> collectionName
+    let updateTokenHashes userId (accessTokenHash: string) (refreshTokenHash: string) =
+        let filter = {| ``_id.UserId`` = userId |> UserId.rawBytes |}
+        let update = {| ``$set`` = {|
+            AccessTokenHash = accessTokenHash
+            RefreshTokenHash = refreshTokenHash
+        |} |}
 
-    let upsert (token: Auth.Token) =
-        let filter = {| ``UserId.UserId`` = token.UserId |> UserId.rawBytes |}
-
-        collection.ReplaceOneAsync(
-            filter.ToBsonDocument() |> BsonDocumentFilterDefinition,
-            token,
-            ReplaceOptions(IsUpsert = true)
+        collection.UpdateOneAsync(
+            filter.ToBsonDocument(),
+            update.ToBsonDocument()
         )
-        |> Task.map ignore
-        |> TaskResult.simpleCatch (fun exn -> sprintf "Repository error, failed to upsert user tokens: %s" (exn.ToString()))
-
-    let findByUserId (userId: UserId) : TaskResult<Auth.Token option, string> =
-        let filter = {| ``UserId.UserId`` = userId |> UserId.rawBytes |}
-
-        filter.ToBsonDocument()
-        |> BsonDocumentFilterDefinition
-        |> collection.FindAsync
-        |> Task.bind (fun users -> users.FirstOrDefaultAsync())
-        |> Task.map Option.ofNull
-        |> TaskResult.simpleCatch (fun exn -> sprintf "Repository error, failed to find user tokens: %s" exn.Message)
+        |> TaskResult.simpleCatch (fun exn -> sprintf "Repository error, failed to update user tokens: %s" (exn.ToString()))
+        |> TaskResult.map (fun x ->
+            x.MatchedCount |> printfn "%A"
+            x.ModifiedCount |> printfn "%A"
+            x.UpsertedId |> printfn "%A"
+        )

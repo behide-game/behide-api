@@ -34,6 +34,9 @@ module Config =
         Environment.GetEnvironmentVariable key
 
     module Auth =
+        open System.Text
+        open Microsoft.IdentityModel.Tokens
+
         module Discord =
             let clientId = get "AUTH_DISCORD_CLIENT_ID"
             let clientSecret = get "AUTH_DISCORD_CLIENT_SECRET"
@@ -43,7 +46,13 @@ module Config =
             let clientSecret = get "AUTH_GOOGLE_CLIENT_SECRET"
 
         module JWT =
+            let tokenDuration = TimeSpan.FromDays 1
+
             let signingKey = get "JWT_SIGNING_KEY"
+            let securityKey =
+                signingKey
+                |> Encoding.UTF8.GetBytes
+                |> SymmetricSecurityKey
 
     module Database =
         let connectionString = get "MONGODB_CONNECTION_STRING"

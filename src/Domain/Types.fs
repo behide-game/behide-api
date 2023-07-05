@@ -40,11 +40,6 @@ type User = {
     Id: UserId
     Name: string
     AuthConnections: AuthConnection []
+    AccessTokenHash: string
+    RefreshTokenHash: string
 }
-
-module Auth =
-    type Token = {
-        UserId: UserId
-        AccessToken: string
-        RefreshToken: string
-    }

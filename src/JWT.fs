@@ -3,76 +3,75 @@ module BehideApi.JWT
 open BehideApi.Types
 open BehideApi.Common
 open BehideApi.Repository
+module Config = Config.Auth.JWT
 
 open System
-open System.Text
 open System.IdentityModel.Tokens.Jwt
 open System.Security.Claims
 open Microsoft.IdentityModel.Tokens
 open FsToolkit.ErrorHandling
 
-
-// JWT Generation
-let tokenDuration = TimeSpan.FromDays 1
-
-let securityKey =
-    Config.Auth.JWT.signingKey
-    |> Encoding.UTF8.GetBytes
-    |> SymmetricSecurityKey
-
-let credentials = SigningCredentials(
-    securityKey,
+let private credentials = SigningCredentials(
+    Config.securityKey,
     SecurityAlgorithms.HmacSha256
 )
 
-let createJwtToken claims =
+let private createJwtToken claims =
     JwtSecurityToken(
         issuer = "https://behide.netlify.app",
         audience = "https://behide.netlify.app",
         claims = claims,
         notBefore = DateTime.Now,
-        expires = DateTime.Now + tokenDuration,
+        expires = DateTime.Now + Config.tokenDuration,
         signingCredentials = credentials
     )
     |> JwtSecurityTokenHandler().WriteToken
 
-let createJwtTokenForUser user =
-    let userId = user.Id |> UserId.rawString
-    let email = user.AuthConnections[0].Email |> Email.raw
+let private createJwtUserClaims userId userName userEmail =
+    let userId = userId |> UserId.rawString
+    let email = userEmail |> Email.raw
 
     [ ClaimTypes.NameIdentifier, userId
-      ClaimTypes.Name, user.Name
+      ClaimTypes.Name, userName
       ClaimTypes.Email, email ]
     |> Seq.map Claim
-    |> createJwtToken
 
 
-// Repository
-let setUserTokens user accessToken refreshToken =
-    let token: Auth.Token =
-        { UserId = user.Id
-          AccessToken = accessToken
-          RefreshToken = refreshToken }
-
-    token |> Database.Tokens.upsert
-
-let getUserTokens (user: User) = user.Id |> Database.Tokens.findByUserId
+let private hashToken user token = Microsoft.AspNetCore.Identity.PasswordHasher().HashPassword(user, token)
 
 
-// JWT Generation + Repository
-let generateTokensForUser user = taskResult {
-    let jwt = createJwtTokenForUser user
+// Public
+let generateTokens userId userName userEmail =
+    let accessToken =
+        (userId, userName, userEmail)
+        |||> createJwtUserClaims
+        |> createJwtToken
+
     let refreshToken = Guid.NewGuid().ToString()
 
-    do! setUserTokens user jwt refreshToken
-    return (jwt, refreshToken)
-}
+    let (accessTokenHash, refreshTokenHash) =
+        accessToken |> hashToken (userId, userName, userEmail),
+        refreshToken |> hashToken (userId, userName, userEmail)
 
-let refreshTokenForUser user accessToken refreshToken = taskResult {
-    let! tokens = getUserTokens user |> TaskResult.bindRequireSome "Failed to retrieve user tokens"
+    accessToken, refreshToken, accessTokenHash, refreshTokenHash
 
-    do! accessToken = tokens.AccessToken |> Result.requireTrue "Invalid access token"
-    do! refreshToken = tokens.RefreshToken |> Result.requireTrue "Invalid refresh token"
 
-    return! generateTokensForUser user
+let verifyUserTokens user accessToken refreshToken = result {
+    let passwordHasher = Microsoft.AspNetCore.Identity.PasswordHasher()
+
+    let! _accessTokenMatch =
+        passwordHasher.VerifyHashedPassword(user, user.AccessTokenHash, accessToken)
+        |> function
+            | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
+            | _ -> true
+        |> Result.requireTrue "Invalid access token"
+
+    let! _refreshTokenMatch =
+        passwordHasher.VerifyHashedPassword(user, user.RefreshTokenHash, refreshToken)
+        |> function
+            | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
+            | _ -> true
+        |> Result.requireTrue "Invalid refresh token"
+
+    ()
 }
