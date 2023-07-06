@@ -7,3 +7,5 @@ module Auth =
         let createResponse accessToken refreshToken : PostAuthRefreshToken_OK =
             { accessToken = accessToken
               refreshToken = refreshToken }
+
+        type Response = PostAuthRefreshToken_OK

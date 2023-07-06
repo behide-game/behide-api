@@ -12,6 +12,7 @@ open Falco
 
 open BehideApi
 open BehideApi.Common
+open NamelessInteractive.FSharp.MongoDB
 
 
 let configureServices (builder: WebHostBuilderContext) (services: IServiceCollection) =
@@ -32,7 +33,7 @@ let configureServices (builder: WebHostBuilderContext) (services: IServiceCollec
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = builder.Configuration["jwt:issuer"],
                 ValidAudience = builder.Configuration["jwt:audience"],
-                IssuerSigningKey = JWT.securityKey
+                IssuerSigningKey = Config.Auth.JWT.securityKey
             )
         )
         .AddDiscord(fun options ->
@@ -56,6 +57,11 @@ let configureApp (_: WebHostBuilderContext) (app: IApplicationBuilder) =
        |> ignore
 
 let createTestServer () =
+    // Register MongoDB serializers
+    SerializationProviderModule.Register()
+    Conventions.ConventionsModule.Register()
+    Serialization.SerializationProviderModule.Register()
+
     WebHost
         .CreateDefaultBuilder()
         .ConfigureServices(configureServices)

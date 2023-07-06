@@ -16,7 +16,7 @@ let private databaseName = "Behide"
 let private database = mongo.GetDatabase databaseName
 
 module Users =
-    open MongoDB.Driver
+
     let private collectionName = "users"
     let collection = database.GetCollection<User> collectionName
 
@@ -61,8 +61,4 @@ module Users =
             update.ToBsonDocument()
         )
         |> TaskResult.simpleCatch (fun exn -> sprintf "Repository error, failed to update user tokens: %s" (exn.ToString()))
-        |> TaskResult.map (fun x ->
-            x.MatchedCount |> printfn "%A"
-            x.ModifiedCount |> printfn "%A"
-            x.UpsertedId |> printfn "%A"
-        )
+        |> TaskResult.map ignore

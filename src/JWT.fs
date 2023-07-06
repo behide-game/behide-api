@@ -59,19 +59,21 @@ let generateTokens userId userName userEmail =
 let verifyUserTokens user accessToken refreshToken = result {
     let passwordHasher = Microsoft.AspNetCore.Identity.PasswordHasher()
 
-    let! _accessTokenMatch =
-        passwordHasher.VerifyHashedPassword(user, user.AccessTokenHash, accessToken)
-        |> function
-            | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
-            | _ -> true
-        |> Result.requireTrue "Invalid access token"
+    try
+        let! _accessTokenMatch =
+            passwordHasher.VerifyHashedPassword(user, user.AccessTokenHash, accessToken)
+            |> function
+                | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
+                | _ -> true
+            |> Result.requireTrue "Invalid access token"
 
-    let! _refreshTokenMatch =
-        passwordHasher.VerifyHashedPassword(user, user.RefreshTokenHash, refreshToken)
-        |> function
-            | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
-            | _ -> true
-        |> Result.requireTrue "Invalid refresh token"
+        let! _refreshTokenMatch =
+            passwordHasher.VerifyHashedPassword(user, user.RefreshTokenHash, refreshToken)
+            |> function
+                | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
+                | _ -> true
+            |> Result.requireTrue "Invalid refresh token"
 
-    ()
+        ()
+    with e -> return! Error e.Message
 }

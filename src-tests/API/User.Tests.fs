@@ -11,6 +11,6 @@ let tests = testList "User" [
         let client = Helpers.getClient()
 
         do! new HttpRequestMessage(HttpMethod.Get, "/user")
-            |> Helpers.send HttpStatusCode.Unauthorized client
+            |> Helpers.Http.send HttpStatusCode.Unauthorized client
     }
 ]

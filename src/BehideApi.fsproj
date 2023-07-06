@@ -4,6 +4,9 @@
     <TargetFramework>net7.0</TargetFramework>
     <NoWarn>NU1701</NoWarn>
   </PropertyGroup>
+  <PropertyGroup>
+    <DefineConstants Condition=" '$(ExtraDefineConstants)' != '' ">$(DefineConstants);$(ExtraDefineConstants)</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="./Repository/Serialization/GuidSerializer.fs" />
     <Compile Include="./Repository/Serialization/SingleUnionTypeSerializer.fs" />

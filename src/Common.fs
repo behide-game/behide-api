@@ -29,6 +29,13 @@ module DotEnv =
 module Config =
     open System
 
+    let isInTest =
+        #if IN_TESTS
+            true
+        #else
+            false
+        #endif
+
     let private get key =
         DotEnv.init
         Environment.GetEnvironmentVariable key
@@ -55,4 +62,7 @@ module Config =
                 |> SymmetricSecurityKey
 
     module Database =
-        let connectionString = get "MONGODB_CONNECTION_STRING"
+        let connectionString =
+            match isInTest with
+            | true -> get "MONGODB_CONNECTION_STRING_TESTS"
+            | false -> get "MONGODB_CONNECTION_STRING"
