@@ -15,8 +15,7 @@ jobs:
       AUTH_GOOGLE_CLIENT_ID: ${{ secrets.AUTH_GOOGLE_CLIENT_ID }}
       AUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.AUTH_GOOGLE_CLIENT_SECRET }}
       JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
-      MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_TEST_CONNECTION_STRING }}
-      MONGODB_CONNECTION_STRING_TESTS: ${{ secrets.MONGODB_TEST_CONNECTION_STRING_TESTS }}
+      MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING_TESTS }}
 
     steps:
     - uses: actions/checkout@v3
@@ -34,7 +33,7 @@ jobs:
       run: dotnet build --no-restore
 
     - name: Perform tests
-      run: dotnet run --no-build --project ./src-tests/BehideApi.Tests.fsproj -p:ExtraDefineConstants=IN_TESTS --fail-on-focused-tests
+      run: dotnet run --no-build --project ./src-tests/BehideApi.Tests.fsproj --fail-on-focused-tests
 
     - name: Test Summary
       uses: test-summary/action@v2
