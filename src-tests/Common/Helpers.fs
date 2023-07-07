@@ -64,5 +64,5 @@ module Auth =
 
         task {
             do! user |> Database.Users.insert
-            return accessToken, refreshToken
+            return user, accessToken, refreshToken
         }

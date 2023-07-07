@@ -60,20 +60,17 @@ let verifyUserTokens user accessToken refreshToken = result {
     let passwordHasher = Microsoft.AspNetCore.Identity.PasswordHasher()
 
     try
-        let! _accessTokenMatch =
-            passwordHasher.VerifyHashedPassword(user, user.AccessTokenHash, accessToken)
+        do! passwordHasher.VerifyHashedPassword(user, user.AccessTokenHash, accessToken)
             |> function
                 | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
                 | _ -> true
             |> Result.requireTrue "Invalid access token"
 
-        let! _refreshTokenMatch =
-            passwordHasher.VerifyHashedPassword(user, user.RefreshTokenHash, refreshToken)
+        do! passwordHasher.VerifyHashedPassword(user, user.RefreshTokenHash, refreshToken)
             |> function
                 | Microsoft.AspNetCore.Identity.PasswordVerificationResult.Failed -> false
                 | _ -> true
             |> Result.requireTrue "Invalid refresh token"
 
-        ()
     with e -> return! Error e.Message
 }

@@ -6,6 +6,7 @@ open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.TestHost
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Microsoft.IdentityModel.Tokens
 
 open Falco
@@ -66,4 +67,12 @@ let createTestServer () =
         .CreateDefaultBuilder()
         .ConfigureServices(configureServices)
         .Configure(configureApp)
+        .ConfigureLogging(fun logging ->
+            logging.AddFilter(function
+                | LogLevel.Critical
+                | LogLevel.Error
+                | LogLevel.Warning -> true
+                | _ -> false
+            ) |> ignore
+        )
     |> fun builder -> new TestServer(builder)
