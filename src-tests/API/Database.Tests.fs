@@ -19,8 +19,7 @@ let tests = testList "Database" [
                 |> Database.Users.findByUserId
                 |> Task.map (Expect.wantSome "Should find user")
 
-            (user, dbUser)
-            ||> Expect.equal "Database user should equal original user"
+            Expecto.Expect.equal user dbUser "Database user should equal original user"
         }
 
         testTask "Find a inexistant user" {
@@ -37,7 +36,6 @@ let tests = testList "Database" [
             do! user.AuthConnections[0].Email
                 |> Database.Users.findAllByUserEmail
                 |> Task.map (Expect.sequenceEqual "Should find user" [ user ])
-                |> Task.map ignore
         }
 
         testTask "Find a user by auth name identifier" {
@@ -46,12 +44,25 @@ let tests = testList "Database" [
             do! user.AuthConnections[0].NameIdentifier
                 |> Database.Users.findAllByUserNameIdentifier
                 |> Task.map (Expect.sequenceEqual "Should find user" [ user ])
-                |> Task.map ignore
 
             do! user.AuthConnections[0].NameIdentifier
                 |> Database.Users.findByUserNameIdentifier
+                |> Task.map (Expect.isSome "Should find user")
+        }
+
+        testTask "Update user token hashes" {
+            let! (user: User), _, _ = Helpers.User.createUser() |> Helpers.Database.addUser
+
+            do! Database.Users.updateTokenHashes user.Id "newAccessTokenHash" "newRefreshTokenHash"
+                |> Task.map (Expect.isOk "User should be updated successfully")
+
+            let! (dbUser: User) =
+                user.Id
+                |> Database.Users.findByUserId
                 |> Task.map (Expect.wantSome "Should find user")
-                |> Task.map ignore
+
+            Expect.equal "AccessTokenHash property should be updated" "newAccessTokenHash" dbUser.AccessTokenHash
+            Expect.equal "RefreshTokenHash property should be updated" "newRefreshTokenHash" dbUser.RefreshTokenHash
         }
     ]
 ]
