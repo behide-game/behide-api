@@ -65,7 +65,6 @@ module Auth =
             let! user =
                 userId
                 |> Database.Users.findByUserId
-                |> Task.map List.tryHead
                 |> TaskResult.ofOption (Response.notFound "Cannot find user")
 
             return user

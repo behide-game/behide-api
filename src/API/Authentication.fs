@@ -77,8 +77,8 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
     let finalRedirectUri = new UriBuilder(redirectUri)
     let finalRedirectQuery = HttpUtility.ParseQueryString(finalRedirectUri.Query)
 
-    let! usersWithSameEmail = Database.Users.findByUserEmail email
-    let! usersWithSameNameIdentifier = Database.Users.findByUserNameIdentifier nameIdentifier
+    let! usersWithSameEmail = Database.Users.findAllByUserEmail email
+    let! usersWithSameNameIdentifier = Database.Users.findAllByUserNameIdentifier nameIdentifier
 
     match usersWithSameNameIdentifier, usersWithSameEmail with
     | [], [] ->
@@ -148,7 +148,7 @@ let completeLogIn (ctx: HttpContext) =
                 |> Result.ofOption (finalRedirectUri, HttpStatusCode.BadRequest) // Cannot find name identifier claim
 
             let! user =
-                Database.Users.findByUserNameIdentifier nameIdentifier
+                Database.Users.findAllByUserNameIdentifier nameIdentifier
                 |> Task.map List.tryHead
                 |> Task.map (Result.ofOption (finalRedirectUri, HttpStatusCode.NotFound))
 
@@ -208,7 +208,6 @@ let refreshToken (ctx: HttpContext) = taskResult {
     let! user =
         userId
         |> Database.Users.findByUserId
-        |> Task.map List.tryHead
         |> TaskResult.ofOption (Response.notFound "User not found")
 
 

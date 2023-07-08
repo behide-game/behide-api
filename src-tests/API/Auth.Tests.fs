@@ -84,7 +84,9 @@ let tests = testList "Auth" [
         }
 
         testTask "Verify tokens" {
-            let! user, (accessToken: string), (refreshToken: string) = Helpers.Auth.createUser()
+            let! user, (accessToken: string), (refreshToken: string) =
+                Helpers.User.createUser()
+                |> Helpers.Database.addUser
 
             BehideApi.JWT.verifyUserTokens user accessToken refreshToken
             |> Expect.wantOk "Tokens should be approved"
@@ -93,7 +95,9 @@ let tests = testList "Auth" [
 
     testTask "Authorized user should be able to refresh his tokens" {
         let client = Helpers.getClient()
-        let! _user, (accessToken: string), (refreshToken: string) = Helpers.Auth.createUser()
+        let! _user, (accessToken: string), (refreshToken: string) =
+            Helpers.User.createUser()
+            |> Helpers.Database.addUser
 
         // Refresh
         let! (response: DTO.Auth.RefreshToken.Response) = (accessToken, refreshToken) |> refreshTokens client

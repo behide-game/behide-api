@@ -16,22 +16,21 @@ let private databaseName = "Behide"
 let private database = mongo.GetDatabase databaseName
 
 module Users =
-
     let private collectionName = "users"
     let collection = database.GetCollection<User> collectionName
 
     let insert = collection.InsertOneAsync
 
-    let findByUserId (userId: UserId) : Task<User list> =
+    let findByUserId (userId: UserId) : Task<User option> =
         let filter = {| ``_id.UserId`` = userId |> UserId.rawBytes |}
 
         filter.ToBsonDocument()
         |> BsonDocumentFilterDefinition
         |> collection.FindAsync
-        |> Task.bind (fun users -> users.ToListAsync())
-        |> Task.map Seq.toList
+        |> Task.bind (fun users -> users.FirstOrDefaultAsync())
+        |> Task.map Option.ofNull
 
-    let findByUserEmail (email: Email) : Task<User list> =
+    let findAllByUserEmail (email: Email) : Task<User list> =
         let filter = {| ``AuthConnections.Email.Email`` = (email |> Email.raw) |}
 
         filter.ToBsonDocument()
@@ -40,7 +39,16 @@ module Users =
         |> Task.bind (fun users -> users.ToListAsync())
         |> Task.map Seq.toList
 
-    let findByUserNameIdentifier (nameIdentifier: string) : Task<User list> =
+    let findByUserNameIdentifier (nameIdentifier: string) : Task<User option> =
+        let filter = {| ``AuthConnections.NameIdentifier`` = nameIdentifier |}
+
+        filter.ToBsonDocument()
+        |> BsonDocumentFilterDefinition
+        |> collection.FindAsync
+        |> Task.bind (fun users -> users.FirstOrDefaultAsync())
+        |> Task.map Option.ofNull
+
+    let findAllByUserNameIdentifier (nameIdentifier: string) : Task<User list> =
         let filter = {| ``AuthConnections.NameIdentifier`` = nameIdentifier |}
 
         filter.ToBsonDocument()

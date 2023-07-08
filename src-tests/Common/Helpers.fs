@@ -7,6 +7,10 @@ open System.Threading.Tasks
 open Thoth.Json.Net
 open FsToolkit.ErrorHandling
 
+open BehideApi
+open BehideApi.Types
+open BehideApi.Repository
+
 
 let getClient () =
     let testServer = TestServer.createTestServer()
@@ -37,11 +41,7 @@ module Http =
         |> Task.map (Decode.fromString Serialization.decoder<'T>)
 
 
-module Auth =
-    open BehideApi
-    open BehideApi.Types
-    open BehideApi.Repository
-
+module User =
     let createUser () =
         let userId = UserId.create()
         let userName = sprintf "test-user-%s" (System.Guid.NewGuid().ToString())
@@ -54,7 +54,7 @@ module Auth =
             Id = userId
             Name = userName
             AuthConnections = {
-                NameIdentifier = "1"
+                NameIdentifier = System.Guid.NewGuid().ToString()
                 Email = userEmail
                 Provider = AuthProvider.Discord
             } |> Array.singleton
@@ -62,7 +62,31 @@ module Auth =
             RefreshTokenHash = refreshTokenHash
         }
 
+        user, accessToken, refreshToken
+
+
+module Database =
+    let addUser (user, accessToken, refreshToken) =
         task {
             do! user |> Database.Users.insert
             return user, accessToken, refreshToken
+        }
+
+    let populateWithUsers () =
+        task {
+            let max = 50f
+            let min = 10f
+            let userCount = System.Random().NextSingle() * (max - min) + min |> int
+            let userList = List.init userCount (ignore >> User.createUser)
+
+            for user in userList do
+                do! user |> addUser |> Task.map ignore
+
+            let randomUserIndex =
+                System.Random().NextSingle()
+                * (float32 userCount)
+                |> System.MathF.Floor
+                |> int
+
+            return userList |> List.item randomUserIndex
         }

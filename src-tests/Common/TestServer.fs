@@ -13,7 +13,6 @@ open Falco
 
 open BehideApi
 open BehideApi.Common
-open NamelessInteractive.FSharp.MongoDB
 
 
 let configureServices (builder: WebHostBuilderContext) (services: IServiceCollection) =
@@ -58,11 +57,6 @@ let configureApp (_: WebHostBuilderContext) (app: IApplicationBuilder) =
        |> ignore
 
 let createTestServer () =
-    // Register MongoDB serializers
-    SerializationProviderModule.Register()
-    Conventions.ConventionsModule.Register()
-    Serialization.SerializationProviderModule.Register()
-
     WebHost
         .CreateDefaultBuilder()
         .ConfigureServices(configureServices)
