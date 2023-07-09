@@ -8,4 +8,5 @@ Microsoft.AspNetCore.Authentication.JwtBearer
 Thoth.Json.Net
 AspNet.Security.OAuth.Discord
 Microsoft.AspNetCore.Authentication.Google
+Microsoft.AspNetCore.Authentication.MicrosoftAccount
 NRedisStack

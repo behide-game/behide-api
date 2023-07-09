@@ -43,15 +43,20 @@ let main args =
                         IssuerSigningKey = Config.Auth.JWT.securityKey
                     )
                 )
-                .AddDiscord(fun options ->
+                .AddDiscord("discord", fun options ->
                     options.ClientId <- Config.Auth.Discord.clientId
                     options.ClientSecret <- Config.Auth.Discord.clientSecret
                     options.CallbackPath <- "/auth/signin-discord"
                 )
-                .AddGoogle(fun options ->
+                .AddGoogle("google", fun options ->
                     options.ClientId <- Config.Auth.Google.clientId
                     options.ClientSecret <- Config.Auth.Google.clientSecret
                     options.CallbackPath <- "/auth/signin-google"
+                )
+                .AddMicrosoftAccount("microsoft", fun options ->
+                    options.ClientId <- Config.Auth.Microsoft.clientId
+                    options.ClientSecret <- Config.Auth.Microsoft.clientSecret
+                    options.CallbackPath <- "/auth/signin-microsoft"
                 )
             |> ignore
         ))

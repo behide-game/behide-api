@@ -5,13 +5,14 @@ storage: symlink
 group Build
 source https://api.nuget.org/v3/index.json
 
-nuget AspNet.Security.OAuth.Discord
 nuget Falco
-nuget FsToolkit.ErrorHandling.TaskResult
 nuget Microsoft.AspNetCore.Authentication.Google
 nuget Microsoft.AspNetCore.Authentication.JwtBearer
+nuget Microsoft.AspNetCore.Authentication.MicrosoftAccount
+nuget AspNet.Security.OAuth.Discord
 nuget mongocsharpdriver
 nuget MongoDB.FSharp
+nuget FsToolkit.ErrorHandling.TaskResult
 nuget NamelessInteractive.FSharp.MongoDB
 nuget NRedisStack
 nuget Thoth.Json.Net

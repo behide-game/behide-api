@@ -22,17 +22,16 @@ open System.Net
 let connectWithProviderAndRedirect (redirectUrl: string) (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
     let! provider =
-        query.GetString("provider", "discord") |> function
-        | "discord" -> Ok "Discord"
-        | "google" -> Ok "Google"
-        | _ -> Error (Response.badRequest "Incorrect provider" ctx)
+        query.GetString("provider", "discord")
+        |> AuthProvider.FromString
+        |> Result.requireSome (Response.badRequest "Invalid provider")
+        |> Result.map AuthProvider.ToString
 
     return Response.challengeWithRedirect
         provider
         (sprintf "%s/%s" redirectUrl (provider.ToLower()))
         ctx
 }
-
 
 
 // ------------------------- Sign up -------------------------
@@ -46,7 +45,7 @@ let createAccount (ctx: HttpContext) = taskResult {
 
     let redirectUri = sprintf "/auth/create-account/complete/%s" finalRedirectUri
 
-    return connectWithProviderAndRedirect redirectUri ctx |> TaskResult.eitherId
+    return (connectWithProviderAndRedirect redirectUri |> Handler.fromTRHandler) ctx
 }
 
 let completeCreateAccount (ctx: HttpContext) = taskResult {
@@ -58,10 +57,9 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
         |> Result.map HttpUtility.UrlDecode
 
     let! provider =
-        route.GetString("provider", "discord") |> function
-        | "discord" -> Ok AuthProvider.Discord
-        | "google" -> Ok AuthProvider.Google
-        | _ -> Error (Response.badRequest "Incorrect provider")
+        route.GetString("provider", "discord")
+        |> AuthProvider.FromString
+        |> Result.requireSome (Response.badRequest "Invalid provider")
 
     let! email =
         Auth.getClaimValue ClaimTypes.Email ctx
@@ -128,7 +126,7 @@ let logIn (ctx: HttpContext) = taskResult {
 
     let redirectUri = sprintf "/auth/log-in/complete/%s" escapedFinalRedirectUri
 
-    return connectWithProviderAndRedirect redirectUri ctx |> TaskResult.eitherId
+    return (connectWithProviderAndRedirect redirectUri |> Handler.fromTRHandler) ctx
 }
 
 let completeLogIn (ctx: HttpContext) =

@@ -45,6 +45,10 @@ module Config =
             let clientId = get "AUTH_GOOGLE_CLIENT_ID"
             let clientSecret = get "AUTH_GOOGLE_CLIENT_SECRET"
 
+        module Microsoft =
+            let clientId = get "AUTH_MICROSOFT_CLIENT_ID"
+            let clientSecret = get "AUTH_MICROSOFT_CLIENT_SECRET"
+
         module JWT =
             let tokenDuration = TimeSpan.FromDays 1
 
