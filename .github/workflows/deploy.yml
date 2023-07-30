@@ -79,7 +79,7 @@ jobs:
     # needs: build-push-image
 
     steps:
-      - name: executing remote ssh commands using password
+      - name: Deploy by SSH
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
