@@ -14,6 +14,11 @@ RUN dotnet restore src
 
 # Build
 COPY src/ src/
+
+COPY hawaii.json .
+COPY openapi.json .
+RUN dotnet hawaii
+
 RUN dotnet publish src -c Release -o /publish
 
 # --- Runtime ---
