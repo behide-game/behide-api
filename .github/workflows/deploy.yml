@@ -1,0 +1,81 @@
+name: ⚡ Deploy
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  perform-tests:
+    name: ⚗️ Perform tests
+    runs-on: behide-internal
+    env:
+      AUTH_DISCORD_CLIENT_SECRET: ${{ secrets.AUTH_DISCORD_CLIENT_SECRET }}
+      AUTH_DISCORD_CLIENT_ID: ${{ secrets.AUTH_DISCORD_CLIENT_ID }}
+      AUTH_GOOGLE_CLIENT_ID: ${{ secrets.AUTH_GOOGLE_CLIENT_ID }}
+      AUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.AUTH_GOOGLE_CLIENT_SECRET }}
+      AUTH_MICROSOFT_CLIENT_ID: ${{ secrets.AUTH_MICROSOFT_CLIENT_ID }}
+      AUTH_MICROSOFT_CLIENT_SECRET: ${{ secrets.AUTH_MICROSOFT_CLIENT_SECRET }}
+      JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+      MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING_TESTS }}
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: 7.0.x
+
+    - run: dotnet tool restore
+    - run: dotnet hawaii
+    - run: dotnet paket restore
+    - run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore
+
+    - name: Perform tests
+      run: dotnet run --no-build --project ./src-tests/BehideApi.Tests.fsproj --fail-on-focused-tests
+
+    - name: Test Summary
+      uses: test-summary/action@v2
+      with:
+        paths: "src-tests/TestResults.xml"
+      if: always()
+
+  build-push-image:
+    name: 📦 Build / Push image
+    runs-on: behide-internal
+    env:
+      AUTH_DISCORD_CLIENT_SECRET: ${{ secrets.AUTH_DISCORD_CLIENT_SECRET }}
+      AUTH_DISCORD_CLIENT_ID: ${{ secrets.AUTH_DISCORD_CLIENT_ID }}
+      AUTH_GOOGLE_CLIENT_ID: ${{ secrets.AUTH_GOOGLE_CLIENT_ID }}
+      AUTH_GOOGLE_CLIENT_SECRET: ${{ secrets.AUTH_GOOGLE_CLIENT_SECRET }}
+      AUTH_MICROSOFT_CLIENT_ID: ${{ secrets.AUTH_MICROSOFT_CLIENT_ID }}
+      AUTH_MICROSOFT_CLIENT_SECRET: ${{ secrets.AUTH_MICROSOFT_CLIENT_SECRET }}
+      JWT_SIGNING_KEY: ${{ secrets.JWT_SIGNING_KEY }}
+      MONGODB_CONNECTION_STRING: ${{ secrets.MONGODB_CONNECTION_STRING }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Process version of the tag
+        id: v
+        uses: ncipollo/semantic-version-action@v1
+
+      - name: Login to registery
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ format('gaelbouquain/behide-api:{0}.{1}.{2}', steps.v.outputs.major, steps.v.outputs.minor, steps.v.outputs.patch) }}
+
+  # deploy:
+  #   name: ⚡ Deploy
+  #   runs-on: [self-hosted, behide-internal]
+  #   needs: build-push-image
+  #   steps:
