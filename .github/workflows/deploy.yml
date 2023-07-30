@@ -76,6 +76,8 @@ jobs:
   deploy:
     name: ⚡ Deploy
     runs-on: behide-internal
+    # needs: build-push-image
+
     steps:
       - name: Install ssh keys
         run: |
