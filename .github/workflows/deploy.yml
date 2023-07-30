@@ -67,8 +67,24 @@ jobs:
           push: true
           tags: ${{ format('gaelbouquain/behide-api:{0}.{1}.{2}', steps.v.outputs.major, steps.v.outputs.minor, steps.v.outputs.patch) }}
 
-  # deploy:
-  #   name: ⚡ Deploy
-  #   runs-on: [self-hosted, behide-internal]
-  #   needs: build-push-image
-  #   steps:
+      - name: Build and push (latest)
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: gaelbouquain/behide-api:latest
+
+  deploy:
+    name: ⚡ Deploy
+    runs-on: behide-internal
+    steps:
+      - name: Install ssh keys
+        run: |
+          install -m 600 -D /dev/null ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} > ~/.ssh/known_hosts
+
+      - name: Connect and pull
+        run: ssh ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "cd ${{ secrets.SSH_WORK_DIR }} && docker-compose pull && docker-compose restart && exit"
+
+      - name: Cleanup
+        run: rm -rf ~/.ssh
