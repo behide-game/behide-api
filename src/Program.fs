@@ -7,6 +7,7 @@ open Falco.HostBuilder
 
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.IdentityModel.Tokens
 
@@ -62,7 +63,8 @@ let main args =
         ))
 
         use_middleware (fun app ->
-            app.UseCookiePolicy(CookiePolicyOptions(MinimumSameSitePolicy = Microsoft.AspNetCore.Http.SameSiteMode.Lax))
+            app.UseHttpsRedirection()
+               .UseCookiePolicy(CookiePolicyOptions(MinimumSameSitePolicy = SameSiteMode.Lax))
         )
 
         use_authorization
