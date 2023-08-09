@@ -63,8 +63,14 @@ let main args =
         ))
 
         use_middleware (fun app ->
-            app.UseHttpsRedirection()
-               .UseCookiePolicy(CookiePolicyOptions(MinimumSameSitePolicy = SameSiteMode.Lax))
+            let forceHttpsHandler = System.Func<HttpContext, RequestDelegate, System.Threading.Tasks.Task>(fun ctx next ->
+                ctx.Request.Scheme <- "https"
+                next.Invoke ctx
+            )
+
+            app.UseCookiePolicy(CookiePolicyOptions(MinimumSameSitePolicy = SameSiteMode.Lax))
+               .UseHttpsRedirection()
+               .Use(forceHttpsHandler)
         )
 
         use_authorization
