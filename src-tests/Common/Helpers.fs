@@ -29,8 +29,8 @@ module Http =
             let! body = response.Content.ReadAsStringAsync()
             return failtestf
                 "Unexpected status code.\nExpected: %s\nActual: %s\nBody: %s"
-                (response.StatusCode |> string)
                 (expectedStatusCode |> string)
+                (response.StatusCode |> string)
                 body
         | true -> return response
     }

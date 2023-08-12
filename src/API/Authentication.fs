@@ -2,6 +2,7 @@ module BehideApi.API.Authentication
 
 open System
 open System.Web
+open System.Net
 open System.Security.Claims
 open System.IdentityModel.Tokens.Jwt
 open Microsoft.AspNetCore.Http
@@ -16,13 +17,17 @@ open BehideApi
 open BehideApi.Types
 open BehideApi.Repository
 open BehideApi.API.Common
-open System.Net
 
 
-let connectWithProviderAndRedirect (redirectUrl: string) (ctx: HttpContext) = taskResult {
+/// 1. Challenge the auth provider in query "provider", the one provided or discord
+/// 2. Redirect to the redirectUrl with the provider used (in this format: "{providedRedirectUrl}/{provider:alpha}"")
+let connectWithProviderAndRedirect (redirectUrl: string) (provider: string option) (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
+
+    let fallbackProvider = provider |> Option.defaultValue "discord"
     let! provider =
-        query.GetString("provider", "discord")
+        query.TryGetString "provider"
+        |> Option.defaultValue fallbackProvider
         |> AuthProvider.FromString
         |> Result.requireSome (Response.badRequest "Invalid provider")
         |> Result.map AuthProvider.ToString
@@ -34,7 +39,8 @@ let connectWithProviderAndRedirect (redirectUrl: string) (ctx: HttpContext) = ta
 }
 
 
-// ------------------------- Sign up -------------------------
+
+// ------------------------- Sign up ------------------------
 
 let createAccount (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
@@ -45,7 +51,7 @@ let createAccount (ctx: HttpContext) = taskResult {
 
     let redirectUri = sprintf "/auth/create-account/complete/%s" finalRedirectUri
 
-    return (connectWithProviderAndRedirect redirectUri |> Handler.fromTRHandler) ctx
+    return (connectWithProviderAndRedirect redirectUri None |> Handler.fromTRHandler) ctx
 }
 
 let completeCreateAccount (ctx: HttpContext) = taskResult {
@@ -126,7 +132,7 @@ let logIn (ctx: HttpContext) = taskResult {
 
     let redirectUri = sprintf "/auth/log-in/complete/%s" escapedFinalRedirectUri
 
-    return (connectWithProviderAndRedirect redirectUri |> Handler.fromTRHandler) ctx
+    return (connectWithProviderAndRedirect redirectUri None |> Handler.fromTRHandler) ctx
 }
 
 let completeLogIn (ctx: HttpContext) =
@@ -174,7 +180,7 @@ let completeLogIn (ctx: HttpContext) =
 
 
 
-// ------------------------- Refresh token -------------------------
+// ---------------------- Refresh token ---------------------
 
 let refreshToken (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
@@ -223,18 +229,165 @@ let refreshToken (ctx: HttpContext) = taskResult {
 }
 
 
+// -------------------- Add auth provider -------------------
+
+let addAuthProvider (ctx: HttpContext) = taskResult {
+
+    // Retrieve query info
+    let query = Request.getQuery ctx
+    let! escapedFinalRedirectUri =
+        query.TryGetString "redirect_uri"
+        |> Result.ofOption (Response.badRequest "Cannot find redirect_uri query")
+        |> Result.map HttpUtility.UrlEncode
+
+    // Retrieve route info
+    let route = Request.getRoute ctx
+
+    let! provider =
+        route.TryGetString "provider"
+        |> Option.bind AuthProvider.FromString
+        |> Result.ofOption (Response.badRequest "provider not found in route")
+
+    let! userId =
+        route.TryGetGuid "user_id"
+        |> Option.map UserId
+        |> Result.ofOption (Response.badRequest "user_id not found in route")
+
+
+    // Check if user exists
+    let! user =
+        userId
+        |> Database.Users.findByUserId
+        |> TaskResult.ofOption (Response.notFound "User not found")
+
+    // Check if provider already used
+    do! user.AuthConnections
+        |> Array.tryFind (fun authConnection -> authConnection.Provider = provider)
+        |> Result.requireNone (Response.badRequest "User already connected to this provider")
+
+    let redirectUri =
+        sprintf "/auth/add-provider/complete/%s/%s"
+            (userId |> UserId.rawString)
+            escapedFinalRedirectUri
+
+    return
+        connectWithProviderAndRedirect
+            redirectUri
+            (provider |> AuthProvider.ToString |> Some)
+        |> Handler.fromTRHandler
+        |> fun handler -> handler ctx
+}
+
+let completeAddAuthProvider (ctx: HttpContext) =
+    taskResult {
+
+        // Retrieve route info
+        let route = Request.getRoute ctx
+        let! redirectUri = result {
+            let! uri =
+                route.TryGetString "final_redirect_uri"
+                |> Option.map HttpUtility.UrlDecode
+                |> Result.ofOption (None, HttpStatusCode.BadRequest, "redirect_uri not provided when completing")
+
+            try
+                return! UriBuilder(uri).Uri.AbsoluteUri |> Ok
+            with _ ->
+                return! Error (None, HttpStatusCode.BadRequest, "redirect_uri provided when completing is invalid")
+        }
+
+        let! userId =
+            route.TryGetGuid "user_id"
+            |> Option.map UserId
+            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "user_id not provided when completing")
+
+        let! provider =
+            route.TryGetString "provider"
+            |> Option.bind AuthProvider.FromString
+            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "provider not provided when completing")
+
+
+        // Retrieve auth info
+        let! nameIdentifier =
+            Auth.getClaimValue ClaimTypes.NameIdentifier ctx
+            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "Cannot find name identifier claim")
+
+        let! email =
+            Auth.getClaimValue ClaimTypes.Email ctx
+            |> Option.map Email.parse
+            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "Cannot find email claim")
+
+
+        // Check if auth connection already exists
+        let! authConnections =
+            userId
+            |> Database.Users.getAuthConnections
+            |> TaskResult.mapError (fun error ->
+                Some redirectUri,
+                HttpStatusCode.InternalServerError,
+                sprintf "Failed to retrieve auth connections: %s" error
+            )
+            |> TaskResult.map (fun x -> x.AuthConnections)
+            |> TaskResult.map (Array.filter (fun authConnection -> authConnection.Provider = provider))
+
+        do! authConnections
+            |> Result.requireEmpty (
+                Some redirectUri,
+                HttpStatusCode.Conflict,
+                "User already connected with this auth provider"
+            )
+
+
+        // Update user
+        let newAuthConnection : AuthConnection =
+            { NameIdentifier = nameIdentifier
+              Email = email
+              Provider = provider }
+
+        do! newAuthConnection
+            |> Database.Users.addAuthConnection userId
+            |> TaskResult.mapError (fun error ->
+                Some redirectUri,
+                HttpStatusCode.InternalServerError,
+                sprintf "Failed to update user in database: %s" error
+            )
+
+        return Response.redirectTemporarily redirectUri ctx
+    }
+    |> TaskResult.mapError (fun (redirectUriOpt, statusCode, error) ->
+        match redirectUriOpt with
+        | None -> Response.badRequest error
+        | Some redirectUri ->
+            let finalRedirectUri = UriBuilder redirectUri
+
+            let query = HttpUtility.ParseQueryString(finalRedirectUri.Query)
+            query.Add("status_code", statusCode |> int |> string)
+            query.Add("error", error)
+            finalRedirectUri.Query <- query.ToString()
+
+            Response.withStatusCode (statusCode |> int)
+            >> Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri
+    )
+
+
 let endpoints = [
+
+    // Sign up
     get "/auth/create-account" (createAccount |> Handler.fromTRHandler)
     get "/auth/create-account/complete/{final_redirect_uri}/{provider:alpha}"
         (Request.ifAuthenticated
             (completeCreateAccount |> Handler.fromTRHandler)
             (Response.unauthorized "Unauthorized"))
 
+    // Login
     get "/auth/log-in" (logIn |> Handler.fromTRHandler)
     get "/auth/log-in/complete/{final_redirect_uri}/{provider:alpha}"
         (Request.ifAuthenticated
             (completeLogIn |> Handler.fromTRHandler)
             (Response.unauthorized "Unauthorized"))
+
+    // Add auth provider
+    get "/auth/add-provider/{user_id:guid}/{provider:alpha}" (addAuthProvider |> Handler.fromTRHandler)
+    get "/auth/add-provider/complete/{user_id:guid}/{final_redirect_uri}/{provider:alpha}" (completeAddAuthProvider |> Handler.fromTRHandler)
 
     post "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
 ]
