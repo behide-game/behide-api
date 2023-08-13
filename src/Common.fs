@@ -58,5 +58,20 @@ module Config =
                 |> Encoding.UTF8.GetBytes
                 |> SymmetricSecurityKey
 
+            let issuer = get "JWT_ISSUER"
+            let audience = get "JWT_AUDIENCE"
+
+            let validationParameters =
+                new TokenValidationParameters(
+                    ClockSkew = TimeSpan.Zero,
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = issuer,
+                    ValidAudience = audience,
+                    IssuerSigningKey = securityKey
+                )
+
     module Database =
         let connectionString = get "MONGODB_CONNECTION_STRING"

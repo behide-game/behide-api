@@ -3,7 +3,9 @@ module BehideApi.API.Common
 open BehideApi.Types
 open BehideApi.Repository
 
+open System
 open System.Text
+open System.Web
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open FsToolkit.ErrorHandling
@@ -22,6 +24,34 @@ module Handler =
             | Ok task -> return! task
             | Error handler -> return! handler ctx
         } :> Task
+
+
+module Request =
+    let private parseRedirectUri name rawUriOpt = result {
+        let! rawUri =
+            rawUriOpt
+            |> Option.map HttpUtility.UrlDecode
+            |> Result.ofOption (name + " not provided")
+
+        try
+            return! UriBuilder(rawUri).Uri.AbsoluteUri |> Ok
+        with _ ->
+            return! Error (sprintf "provided %s is not valid" name)
+    }
+
+    module Route =
+        let getRedirectUri name ctx =
+            let route = Falco.Request.getRoute ctx
+
+            route.TryGetString name
+            |> parseRedirectUri name
+
+    module Query =
+        let getRedirectUri name ctx =
+            let query = Falco.Request.getQuery ctx
+
+            query.TryGetString name
+            |> parseRedirectUri name
 
 module Auth =
     open Falco
@@ -50,8 +80,8 @@ module Auth =
                 return! handleOk ctx
         } :> Task
 
-    let getBehideUser (ctx: HttpContext) =
-        taskResult {
+    let getBehideUserId (ctx: HttpContext) =
+        result {
             let parseUserId =
                 UserId.tryParse
                 >> Result.ofOption (Response.unauthorized "Unauthorized, failed to parse name identifier")
@@ -61,6 +91,13 @@ module Auth =
                 |> Auth.getClaimValue ClaimTypes.NameIdentifier
                 |> Result.ofOption (Response.unauthorized "Unauthorized")
                 |> Result.bind parseUserId
+
+            return userId
+        }
+
+    let getBehideUser (ctx: HttpContext) =
+        taskResult {
+            let! userId = getBehideUserId ctx
 
             let! user =
                 userId

@@ -124,13 +124,12 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
 // ------------------------- Log in -------------------------
 
 let logIn (ctx: HttpContext) = taskResult {
-    let query = Request.getQuery ctx
-    let! escapedFinalRedirectUri =
-        query.TryGetString "redirect_uri"
-        |> Result.ofOption (Response.badRequest "Cannot find redirect_uri query")
-        |> Result.map HttpUtility.UrlEncode
+    let! finalRedirectUri =
+        ctx
+        |> Request.Query.getRedirectUri "redirect_uri"
+        |> Result.mapError Response.badRequest
 
-    let redirectUri = sprintf "/auth/log-in/complete/%s" escapedFinalRedirectUri
+    let redirectUri = sprintf "/auth/log-in/complete/%s" (finalRedirectUri |> HttpUtility.UrlEncode)
 
     return (connectWithProviderAndRedirect redirectUri None |> Handler.fromTRHandler) ctx
 }
@@ -201,13 +200,8 @@ let refreshToken (ctx: HttpContext) = taskResult {
 
     let! userId =
         accessToken.Claims
-        |> Seq.tryFind (fun claim -> claim.Type = ClaimTypes.NameIdentifier)
-        |> Result.ofOption (Response.unauthorized "Unauthorized")
-        |> Result.bind (fun claim ->
-            claim.Value
-            |> UserId.tryParse
-            |> Result.ofOption (Response.unauthorized "Unauthorized, failed to parse name identifier")
-        )
+        |> JWT.getUserIdFromClaims
+        |> Result.mapError (sprintf "Unauthorized: %s" >> Response.unauthorized)
 
     let! user =
         userId
@@ -235,23 +229,30 @@ let addAuthProvider (ctx: HttpContext) = taskResult {
 
     // Retrieve query info
     let query = Request.getQuery ctx
-    let! escapedFinalRedirectUri =
-        query.TryGetString "redirect_uri"
-        |> Result.ofOption (Response.badRequest "Cannot find redirect_uri query")
-        |> Result.map HttpUtility.UrlEncode
 
-    // Retrieve route info
-    let route = Request.getRoute ctx
+    let! finalRedirectUri =
+        ctx
+        |> Request.Query.getRedirectUri "redirect_uri"
+        |> Result.mapError Response.badRequest
 
     let! provider =
-        route.TryGetString "provider"
+        query.TryGetString "provider"
         |> Option.bind AuthProvider.FromString
-        |> Result.ofOption (Response.badRequest "provider not found in route")
+        |> Result.ofOption (Response.badRequest "provider not found in query")
+
+    let! accessToken =
+        query.TryGetString "access_token"
+        |> Result.ofOption (Response.badRequest "access_token not found in query")
+
+    let! jwt =
+        accessToken
+        |> JWT.validateToken
+        |> Result.mapError (sprintf "Unauthorized: %s" >> Response.unauthorized)
 
     let! userId =
-        route.TryGetGuid "user_id"
-        |> Option.map UserId
-        |> Result.ofOption (Response.badRequest "user_id not found in route")
+        jwt.Claims
+        |> JWT.getUserIdFromClaims
+        |> Result.mapError (sprintf "Unauthorized: %s" >> Response.unauthorized)
 
 
     // Check if user exists
@@ -267,8 +268,8 @@ let addAuthProvider (ctx: HttpContext) = taskResult {
 
     let redirectUri =
         sprintf "/auth/add-provider/complete/%s/%s"
-            (userId |> UserId.rawString)
-            escapedFinalRedirectUri
+            accessToken
+            (finalRedirectUri |> HttpUtility.UrlEncode)
 
     return
         connectWithProviderAndRedirect
@@ -283,27 +284,37 @@ let completeAddAuthProvider (ctx: HttpContext) =
 
         // Retrieve route info
         let route = Request.getRoute ctx
-        let! redirectUri = result {
-            let! uri =
-                route.TryGetString "final_redirect_uri"
-                |> Option.map HttpUtility.UrlDecode
-                |> Result.ofOption (None, HttpStatusCode.BadRequest, "redirect_uri not provided when completing")
-
-            try
-                return! UriBuilder(uri).Uri.AbsoluteUri |> Ok
-            with _ ->
-                return! Error (None, HttpStatusCode.BadRequest, "redirect_uri provided when completing is invalid")
-        }
-
-        let! userId =
-            route.TryGetGuid "user_id"
-            |> Option.map UserId
-            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "user_id not provided when completing")
+        let! redirectUri =
+            ctx
+            |> Request.Route.getRedirectUri "final_redirect_uri"
+            |> Result.mapError (fun error -> None, HttpStatusCode.BadRequest, error)
 
         let! provider =
             route.TryGetString "provider"
             |> Option.bind AuthProvider.FromString
             |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "provider not provided when completing")
+
+        let! accessToken =
+            route.TryGetString "access_token"
+            |> Result.ofOption (None, HttpStatusCode.BadRequest, "access_token not found in route when completing")
+
+        let! jwt =
+            accessToken
+            |> JWT.validateToken
+            |> Result.mapError (fun error ->
+                None,
+                HttpStatusCode.Unauthorized,
+                (sprintf "Unauthorized: %s" error)
+            )
+
+        let! userId =
+            jwt.Claims
+            |> JWT.getUserIdFromClaims
+            |> Result.mapError (fun error ->
+                None,
+                HttpStatusCode.Unauthorized,
+                (sprintf "Unauthorized: %s" error)
+            )
 
 
         // Retrieve auth info
@@ -385,8 +396,8 @@ let endpoints = [
             (Response.unauthorized "Unauthorized"))
 
     // Add auth provider
-    get "/auth/add-provider/{user_id:guid}/{provider:alpha}" (addAuthProvider |> Handler.fromTRHandler)
-    get "/auth/add-provider/complete/{user_id:guid}/{final_redirect_uri}/{provider:alpha}" (completeAddAuthProvider |> Handler.fromTRHandler)
+    get "/auth/add-provider" (addAuthProvider |> Handler.fromTRHandler)
+    get "/auth/add-provider/complete/{access_token}/{final_redirect_uri}/{provider:alpha}" (completeAddAuthProvider |> Handler.fromTRHandler)
 
     post "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
 ]
