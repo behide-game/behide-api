@@ -19,7 +19,7 @@ let tests = testList "Database" [
                 |> Database.Users.findByUserId
                 |> Task.map (Expect.wantSome "Should find user")
 
-            Expecto.Expect.equal user dbUser "Database user should equal original user"
+            Expect.equal "Database user should equal original user" user dbUser
         }
 
         testTask "Find a inexistant user" {
@@ -63,6 +63,61 @@ let tests = testList "Database" [
 
             Expect.equal "AccessTokenHash property should be updated" "newAccessTokenHash" dbUser.AccessTokenHash
             Expect.equal "RefreshTokenHash property should be updated" "newRefreshTokenHash" dbUser.RefreshTokenHash
+        }
+
+        testTask "Get user auth connections" {
+
+            // Generate user
+            let authConnections = Helpers.User.createAuthConnectionForAllProviders()
+
+            let! user, _, _ =
+                authConnections
+                |> Helpers.User.createUserWithAuthConnections
+                |> Helpers.Database.addUser
+
+            // Test
+            let! dbAuthConnections =
+                user.Id
+                |> Database.Users.getAuthConnections
+                |> Task.map (Expect.wantOk "Should be able to retrieve user auth connections")
+
+            (authConnections, dbAuthConnections)
+            ||> Expect.sequenceEqual "Auth connections should equal"
+        }
+
+        testTask "Add user auth connections" {
+
+            // Generate user
+            let baseAuthConnection = AuthProvider.Discord |> Helpers.User.createAuthConnection
+            let! user, _, _ =
+                baseAuthConnection
+                |> Array.singleton
+                |> Helpers.User.createUserWithAuthConnections
+                |> Helpers.Database.addUser
+
+            // Update user
+            let newAuthConnection = Helpers.User.createAuthConnection AuthProvider.Google
+
+            do! newAuthConnection
+                |> Database.Users.addAuthConnection user.Id
+                |> Task.map (Expect.wantOk "Should be able to add auth connection to a user")
+
+            // Update user a 2nd time
+            let newAuthConnection2 = Helpers.User.createAuthConnection AuthProvider.Microsoft
+
+            do! newAuthConnection2
+                |> Database.Users.addAuthConnection user.Id
+                |> Task.map (Expect.wantOk "Should be able to add auth connection to a user")
+
+            // Check
+            let! dbAuthConnections =
+                user.Id
+                |> Database.Users.getAuthConnections
+                |> Task.map (Expect.wantOk "Should be able to retrieve user auth connections")
+
+            Expect.sequenceEqual "Auth connections should equal"
+                [| baseAuthConnection; newAuthConnection; newAuthConnection2 |]
+                dbAuthConnections
         }
     ]
 ]

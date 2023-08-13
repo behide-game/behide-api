@@ -326,7 +326,6 @@ let completeAddAuthProvider (ctx: HttpContext) =
                 HttpStatusCode.InternalServerError,
                 sprintf "Failed to retrieve auth connections: %s" error
             )
-            |> TaskResult.map (fun x -> x.AuthConnections)
             |> TaskResult.map (Array.filter (fun authConnection -> authConnection.Provider = provider))
 
         do! authConnections

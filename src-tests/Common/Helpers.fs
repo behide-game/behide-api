@@ -64,6 +64,21 @@ module User =
 
         user, accessToken, refreshToken
 
+    let createUserWithAuthConnections authConnections =
+        let rawUser, accessToken, refreshToken = createUser()
+        { rawUser with AuthConnections = authConnections}, accessToken, refreshToken
+
+    let createAuthConnection provider =
+        { NameIdentifier = System.Guid.NewGuid().ToString()
+          Email = System.Guid.NewGuid().ToString() |> sprintf "%s@behide.com" |> Email.parse
+          Provider = provider }
+
+    let createAuthConnectionForAllProviders () =
+        [| AuthProvider.Discord
+           AuthProvider.Google
+           AuthProvider.Microsoft |]
+        |> Array.map createAuthConnection
+
 
 module Database =
     let addUser (user, accessToken, refreshToken) =
@@ -74,18 +89,18 @@ module Database =
 
     let populateWithUsers () =
         task {
-            let max = 50f
-            let min = 10f
-            let userCount = System.Random().NextSingle() * (max - min) + min |> int
+            let max = 20.
+            let min = 5.
+            let userCount = System.Random().NextDouble() * (max - min) + min |> int
             let userList = List.init userCount (ignore >> User.createUser)
 
             for user in userList do
                 do! user |> addUser |> Task.map ignore
 
             let randomUserIndex =
-                System.Random().NextSingle()
-                * (float32 userCount)
-                |> System.MathF.Floor
+                System.Random().NextDouble()
+                * (float userCount)
+                |> System.Math.Floor
                 |> int
 
             return userList |> List.item randomUserIndex

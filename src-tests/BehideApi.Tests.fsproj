@@ -10,7 +10,8 @@
     <Compile Include="./Common/TestServer.fs" />
     <Compile Include="./Common/Helpers.fs" />
 
-    <Compile Include="./API/Database.Tests.fs" />
+    <Compile Include="./Database/User.Tests.fs" />
+
     <Compile Include="./API/Auth.Tests.fs" />
     <Compile Include="./API/User.Tests.fs" />
 

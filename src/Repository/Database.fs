@@ -87,8 +87,12 @@ module Users =
             match res with
             | Ok x ->
                 let! y = x.FirstAsync()
-                return Ok y
-            | Error x -> return Error x
+                return Ok y.AuthConnections
+            | Error error ->
+                return
+                    error
+                    |> sprintf "Repository error, failed to retrieve auth connections, user not found: %s"
+                    |> Error
         })
 
     let addAuthConnection userId (newAuthConnection: AuthConnection) = // TODO: to test
