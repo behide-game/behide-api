@@ -17,6 +17,7 @@ open BehideApi
 open BehideApi.Types
 open BehideApi.Repository
 open BehideApi.API.Common
+open BehideApi.Common.Config
 
 
 /// 1. Challenge the auth provider in query "provider", the one provided or discord
@@ -92,11 +93,10 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
     let finalRedirectUri = new UriBuilder(redirectUri)
     let finalRedirectQuery = HttpUtility.ParseQueryString(finalRedirectUri.Query)
 
-    let! usersWithSameEmail = Database.Users.findAllByUserEmail email
     let! usersWithSameNameIdentifier = Database.Users.findAllByUserNameIdentifier nameIdentifier
 
-    match usersWithSameNameIdentifier, usersWithSameEmail with
-    | [], [] ->
+    match usersWithSameNameIdentifier with
+    | [] ->
         let userId = UserId.create()
         let userName = "Temp name" // TODO -> Add a default random name
 
@@ -121,8 +121,7 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
         finalRedirectQuery.Add("access_token", accessToken)
         finalRedirectQuery.Add("refresh_token", refreshToken)
 
-    | [ _user ], _ -> finalRedirectQuery.Add("error", "user-already-exists")
-    | [], [ _user ] -> finalRedirectQuery.Add("error", "user-with-same-email-exists")
+    | [ _user ] -> finalRedirectQuery.Add("error", "user-already-exists")
     | _ -> finalRedirectQuery.Add("error", "many-users-already-exist")
 
     finalRedirectUri.Query <- finalRedirectQuery.ToString()
@@ -349,7 +348,7 @@ let completeAddAuthProvider (ctx: HttpContext) =
 
 
         // Check if auth connection already exists
-        let! authConnections =
+        let! userAuthConnections =
             userId
             |> Database.Users.getAuthConnections
             |> TaskResult.mapError (fun error ->
@@ -359,11 +358,22 @@ let completeAddAuthProvider (ctx: HttpContext) =
             )
             |> TaskResult.map (Array.filter (fun authConnection -> authConnection.Provider = provider))
 
-        do! authConnections
+        let! otherUsersWithSameNameIdentifier =
+            nameIdentifier
+            |> Database.Users.findAllByUserNameIdentifier
+
+        do! userAuthConnections
             |> Result.requireEmpty (
                 Some redirectUri,
                 HttpStatusCode.Conflict,
                 "User already connected with this auth provider"
+            )
+
+        do! otherUsersWithSameNameIdentifier
+            |> Result.requireEmpty (
+                Some redirectUri,
+                HttpStatusCode.Conflict,
+                "Other users already logged with this account"
             )
 
 
