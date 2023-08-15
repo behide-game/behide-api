@@ -29,8 +29,8 @@ let connectWithProviderAndRedirect (redirectUrl: string) (provider: string optio
         query.TryGetString "provider"
         |> Option.defaultValue fallbackProvider
         |> AuthProvider.FromString
+        |> Option.map AuthProvider.ToString
         |> Result.requireSome (Response.badRequest "Invalid provider")
-        |> Result.map AuthProvider.ToString
 
     return Response.challengeWithRedirect
         provider
@@ -425,6 +425,8 @@ let endpoints = [
             (completeAddAuthProvider |> Handler.fromTRHandler)
             (Response.unauthorized "Unauthorized")
          |> Response.clearAllCookiesAfter)
+
+    // The endpoints above are in GET because the should be called directly in a web browser
 
     post "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
 ]
