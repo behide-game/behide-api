@@ -407,18 +407,24 @@ let endpoints = [
     get "/auth/create-account/complete/{final_redirect_uri}/{provider:alpha}"
         (Request.ifAuthenticated
             (completeCreateAccount |> Handler.fromTRHandler)
-            (Response.unauthorized "Unauthorized"))
+            (Response.unauthorized "Unauthorized")
+         |> Response.clearAllCookiesAfter)
 
     // Login
     get "/auth/log-in" (logIn |> Handler.fromTRHandler)
     get "/auth/log-in/complete/{final_redirect_uri}/{provider:alpha}"
         (Request.ifAuthenticated
             (completeLogIn |> Handler.fromTRHandler)
-            (Response.unauthorized "Unauthorized"))
+            (Response.unauthorized "Unauthorized")
+         |> Response.clearAllCookiesAfter)
 
     // Add auth provider
     get "/auth/add-provider" (addAuthProvider |> Handler.fromTRHandler)
-    get "/auth/add-provider/complete/{access_token}/{final_redirect_uri}/{provider:alpha}" (completeAddAuthProvider |> Handler.fromTRHandler)
+    get "/auth/add-provider/complete/{access_token}/{final_redirect_uri}/{provider:alpha}"
+        (Request.ifAuthenticated
+            (completeAddAuthProvider |> Handler.fromTRHandler)
+            (Response.unauthorized "Unauthorized")
+         |> Response.clearAllCookiesAfter)
 
     post "/auth/refresh-token" (refreshToken |> Handler.fromTRHandler)
 ]

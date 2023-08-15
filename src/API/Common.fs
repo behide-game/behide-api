@@ -3,9 +3,7 @@ module BehideApi.API.Common
 open BehideApi.Types
 open BehideApi.Repository
 
-open System
 open System.Text
-open System.Web
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Http
 open FsToolkit.ErrorHandling
@@ -17,6 +15,7 @@ let jsonOptions =
         PropertyNamingPolicy = Json.JsonNamingPolicy.CamelCase
     )
 
+
 module Handler =
     let fromTRHandler (handler: HttpContext -> TaskResult<Task, (HttpContext -> Task)>) ctx =
         task {
@@ -26,32 +25,15 @@ module Handler =
         } :> Task
 
 
-module Request =
-    let private parseRedirectUri name rawUriOpt = result {
-        let! rawUri =
-            rawUriOpt
-            |> Option.map HttpUtility.UrlDecode
-            |> Result.ofOption (name + " not provided")
+module Response =
+    open Falco
 
-        try
-            return! UriBuilder(rawUri).Uri.AbsoluteUri |> Ok
-        with _ ->
-            return! Error (sprintf "provided %s is not valid" name)
-    }
+    let clearAllCookiesAfter (handler: HttpHandler) (ctx: HttpContext) =
+        let cookies = Request.getCookie ctx
+        cookies.Keys |> Seq.iter ctx.Response.Cookies.Delete
 
-    module Route =
-        let getRedirectUri name ctx =
-            let route = Falco.Request.getRoute ctx
+        handler ctx
 
-            route.TryGetString name
-            |> parseRedirectUri name
-
-    module Query =
-        let getRedirectUri name ctx =
-            let query = Falco.Request.getQuery ctx
-
-            query.TryGetString name
-            |> parseRedirectUri name
 
 module Auth =
     open Falco
