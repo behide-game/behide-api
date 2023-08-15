@@ -3,6 +3,8 @@
 open BehideApi.Common
 open NamelessInteractive.FSharp.MongoDB
 
+open Falco
+open Falco.Routing
 open Falco.HostBuilder
 
 open Microsoft.AspNetCore.Authentication.Cookies
@@ -10,8 +12,8 @@ open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
 
-
 let allEndpoints = [
+    any "/" (Response.ofPlainText "It's alive!")
     yield! API.Authentication.endpoints
     yield! API.User.endpoints
 ]
