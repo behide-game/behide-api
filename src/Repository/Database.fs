@@ -71,7 +71,7 @@ module Users =
         |> TaskResult.simpleCatch (fun exn -> sprintf "Repository error, failed to update user tokens: %s" (exn.ToString()))
         |> TaskResult.map ignore
 
-    let getAuthConnections userId = // TODO: to test
+    let getAuthConnections userId =
         let aggregation =[|
             {| ``$match`` = {| ``_id.UserId`` = userId |> UserId.raw |} |}.ToBsonDocument()
             {| ``$project`` =
@@ -95,7 +95,7 @@ module Users =
                     |> Error
         })
 
-    let addAuthConnection userId (newAuthConnection: AuthConnection) = // TODO: to test
+    let addAuthConnection userId (newAuthConnection: AuthConnection) =
         let filter = {| ``_id.UserId`` = userId |> UserId.raw |}
         let update = {| ``$push`` = {| AuthConnections = newAuthConnection |} |}
 
