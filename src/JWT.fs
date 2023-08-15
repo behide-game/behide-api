@@ -2,7 +2,6 @@ module BehideApi.JWT
 
 open BehideApi.Types
 open BehideApi.Common
-open BehideApi.Repository
 module Config = Config.Auth.JWT
 
 open System
@@ -55,7 +54,6 @@ let generateTokens userId userName userEmail =
 
     accessToken, refreshToken, accessTokenHash, refreshTokenHash
 
-
 let verifyUserTokens user accessToken refreshToken = result {
     let passwordHasher = Microsoft.AspNetCore.Identity.PasswordHasher()
 
@@ -74,3 +72,22 @@ let verifyUserTokens user accessToken refreshToken = result {
 
     with e -> return! Error e.Message
 }
+
+let validateToken (token: string) = // to test
+    let handler = new JwtSecurityTokenHandler()
+    let mutable validatedToken: SecurityToken = upcast new JwtSecurityToken()
+
+    try
+        handler.ValidateToken(token, Config.validationParameters, &validatedToken)
+        |> Ok
+    with ex -> Error $"Exception: {ex.Message}"
+
+let getUserIdFromClaims (claims: #seq<Claim>) = // to test
+    claims
+    |> Seq.tryFind (fun claim -> claim.Type = ClaimTypes.NameIdentifier)
+    |> Result.ofOption "name identifier claim not found"
+    |> Result.bind (fun claim ->
+        claim.Value
+        |> UserId.tryParse
+        |> Result.ofOption "failed to parse name identifier claim"
+    )

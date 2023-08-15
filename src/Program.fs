@@ -3,16 +3,17 @@
 open BehideApi.Common
 open NamelessInteractive.FSharp.MongoDB
 
+open Falco
+open Falco.Routing
 open Falco.HostBuilder
 
 open Microsoft.AspNetCore.Authentication.Cookies
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Microsoft.Extensions.DependencyInjection
-open Microsoft.IdentityModel.Tokens
-
 
 let allEndpoints = [
+    any "/" (Response.ofPlainText "It's alive!")
     yield! API.Authentication.endpoints
     yield! API.User.endpoints
 ]
@@ -33,16 +34,7 @@ let main args =
                     options.LogoutPath <- "/auth/sign-out"
                 )
                 .AddJwtBearer(fun options ->
-                    options.TokenValidationParameters <- new TokenValidationParameters(
-                        ClockSkew = System.TimeSpan.Zero,
-                        ValidateIssuer = true,
-                        ValidateAudience = true,
-                        ValidateLifetime = true,
-                        ValidateIssuerSigningKey = true,
-                        ValidIssuer = builder.Configuration["jwt:issuer"],
-                        ValidAudience = builder.Configuration["jwt:audience"],
-                        IssuerSigningKey = Config.Auth.JWT.securityKey
-                    )
+                    options.TokenValidationParameters <- Config.Auth.JWT.validationParameters
                 )
                 .AddDiscord("discord", fun options ->
                     options.ClientId <- Config.Auth.Discord.clientId

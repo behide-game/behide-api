@@ -15,6 +15,7 @@ let jsonOptions =
         PropertyNamingPolicy = Json.JsonNamingPolicy.CamelCase
     )
 
+
 module Handler =
     let fromTRHandler (handler: HttpContext -> TaskResult<Task, (HttpContext -> Task)>) ctx =
         task {
@@ -22,6 +23,17 @@ module Handler =
             | Ok task -> return! task
             | Error handler -> return! handler ctx
         } :> Task
+
+
+module Response =
+    open Falco
+
+    let clearAllCookiesAfter (handler: HttpHandler) (ctx: HttpContext) =
+        let cookies = Request.getCookie ctx
+        cookies.Keys |> Seq.iter ctx.Response.Cookies.Delete
+
+        handler ctx
+
 
 module Auth =
     open Falco
@@ -50,8 +62,8 @@ module Auth =
                 return! handleOk ctx
         } :> Task
 
-    let getBehideUser (ctx: HttpContext) =
-        taskResult {
+    let getBehideUserId (ctx: HttpContext) =
+        result {
             let parseUserId =
                 UserId.tryParse
                 >> Result.ofOption (Response.unauthorized "Unauthorized, failed to parse name identifier")
@@ -61,6 +73,13 @@ module Auth =
                 |> Auth.getClaimValue ClaimTypes.NameIdentifier
                 |> Result.ofOption (Response.unauthorized "Unauthorized")
                 |> Result.bind parseUserId
+
+            return userId
+        }
+
+    let getBehideUser (ctx: HttpContext) =
+        taskResult {
+            let! userId = getBehideUserId ctx
 
             let! user =
                 userId
