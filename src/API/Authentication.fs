@@ -38,6 +38,17 @@ let connectWithProviderAndRedirect (redirectUrl: string) (provider: string optio
         ctx
 }
 
+let parseRedirectUri name rawUriOpt = result {
+    let! rawUri =
+        rawUriOpt
+        |> Option.map HttpUtility.UrlDecode
+        |> Result.ofOption (name + " not provided")
+
+    try
+        return! UriBuilder(rawUri).Uri.AbsoluteUri |> Ok
+    with _ ->
+        return! Error (sprintf "provided %s is not valid" name)
+}
 
 
 // ------------------------- Sign up ------------------------
@@ -46,10 +57,10 @@ let createAccount (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
     let! finalRedirectUri =
         query.TryGetString "redirect_uri"
-        |> Result.ofOption (Response.badRequest "Cannot find redirect_uri query")
-        |> Result.map HttpUtility.UrlEncode
+        |> parseRedirectUri "redirect_uri"
+        |> Result.mapError Response.badRequest
 
-    let redirectUri = sprintf "/auth/create-account/complete/%s" finalRedirectUri
+    let redirectUri = sprintf "/auth/create-account/complete/%s" (finalRedirectUri |> HttpUtility.UrlEncode)
 
     return (connectWithProviderAndRedirect redirectUri None |> Handler.fromTRHandler) ctx
 }
@@ -59,8 +70,8 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
     let route = Request.getRoute ctx
     let! redirectUri =
         route.TryGetStringNonEmpty "final_redirect_uri"
-        |> Result.ofOption (Response.badRequest "Cannot find the final_redirect_uri in route")
-        |> Result.map HttpUtility.UrlDecode
+        |> parseRedirectUri "final_redirect_uri"
+        |> Result.eitherMap HttpUtility.UrlDecode Response.badRequest
 
     let! provider =
         route.GetString("provider", "discord")
@@ -124,9 +135,10 @@ let completeCreateAccount (ctx: HttpContext) = taskResult {
 // ------------------------- Log in -------------------------
 
 let logIn (ctx: HttpContext) = taskResult {
+    let query = Request.getQuery ctx
     let! finalRedirectUri =
-        ctx
-        |> Request.Query.getRedirectUri "redirect_uri"
+        query.TryGetStringNonEmpty "redirect_uri"
+        |> parseRedirectUri "redirect_uri"
         |> Result.mapError Response.badRequest
 
     let redirectUri = sprintf "/auth/log-in/complete/%s" (finalRedirectUri |> HttpUtility.UrlEncode)
@@ -137,44 +149,52 @@ let logIn (ctx: HttpContext) = taskResult {
 let completeLogIn (ctx: HttpContext) =
     taskResult {
         let route = Request.getRoute ctx
-        let redirectUriOpt =
+        let! redirectUri =
             route.TryGetString "final_redirect_uri"
-            |> Option.map HttpUtility.UrlDecode
+            |> parseRedirectUri "redirect_uri"
+            |> Result.mapError (fun error -> None, HttpStatusCode.BadRequest, error)
 
+        let finalRedirectUri = new UriBuilder(redirectUri)
+
+        let! nameIdentifier =
+            Auth.getClaimValue ClaimTypes.NameIdentifier ctx
+            |> Result.ofOption (Some redirectUri, HttpStatusCode.BadRequest, "Cannot find name identifier claim")
+
+        let! user =
+            Database.Users.findAllByUserNameIdentifier nameIdentifier
+            |> Task.map List.tryHead
+            |> Task.map (Result.ofOption (Some redirectUri, HttpStatusCode.NotFound, "User not found"))
+
+        // Generate JWT token and put it into redirectUri's query
+        let accessToken, refreshToken, accessTokenHash, refreshTokenHash =
+            JWT.generateTokens user.Id user.Name user.AuthConnections[0].Email
+
+        do! Database.Users.updateTokenHashes user.Id accessTokenHash refreshTokenHash
+            |> TaskResult.mapError (fun _error -> Some redirectUri, HttpStatusCode.InternalServerError, "Failed to update user tokens")
+
+        let query = HttpUtility.ParseQueryString(finalRedirectUri.Query)
+        query.Add("access_token", accessToken)
+        query.Add("refresh_token", refreshToken)
+        finalRedirectUri.Query <- query.ToString()
+
+        return Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri ctx
+    }
+    |> TaskResult.mapError (fun (redirectUriOpt, statusCode, error) ->
         match redirectUriOpt with
-        | None -> return Response.badRequest "Cannot find the final_redirect_uri in route" ctx
+        | None ->
+            Response.withStatusCode (statusCode |> int)
+            >> Response.ofPlainText error
         | Some redirectUri ->
-            let finalRedirectUri = new UriBuilder(redirectUri)
 
-            let! nameIdentifier =
-                Auth.getClaimValue ClaimTypes.NameIdentifier ctx
-                |> Result.ofOption (finalRedirectUri, HttpStatusCode.BadRequest) // Cannot find name identifier claim
-
-            let! user =
-                Database.Users.findAllByUserNameIdentifier nameIdentifier
-                |> Task.map List.tryHead
-                |> Task.map (Result.ofOption (finalRedirectUri, HttpStatusCode.NotFound))
-
-            // Generate JWT token and put it into redirectUri's query
-            let accessToken, refreshToken, accessTokenHash, refreshTokenHash =
-                JWT.generateTokens user.Id user.Name user.AuthConnections[0].Email
-
-            do! Database.Users.updateTokenHashes user.Id accessTokenHash refreshTokenHash
-                |> TaskResult.mapError (fun _error -> finalRedirectUri, HttpStatusCode.InternalServerError) // Failed to update user tokens
+            let finalRedirectUri = UriBuilder redirectUri
 
             let query = HttpUtility.ParseQueryString(finalRedirectUri.Query)
-            query.Add("access_token", accessToken)
-            query.Add("refresh_token", refreshToken)
+            query.Add("status_code", statusCode |> int |> string)
+            query.Add("error", error)
             finalRedirectUri.Query <- query.ToString()
 
-            return Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri ctx
-    }
-    |> TaskResult.mapError (fun (redirectUri, statusCode) ->
-        let query = HttpUtility.ParseQueryString(redirectUri.Query)
-        query.Add("error", statusCode |> int |> string)
-        redirectUri.Query <- query.ToString()
-
-        Response.redirectTemporarily redirectUri.Uri.AbsoluteUri
+            Response.withStatusCode (statusCode |> int)
+            >> Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri
     )
 
 
@@ -231,8 +251,8 @@ let addAuthProvider (ctx: HttpContext) = taskResult {
     let query = Request.getQuery ctx
 
     let! finalRedirectUri =
-        ctx
-        |> Request.Query.getRedirectUri "redirect_uri"
+        query.TryGetStringNonEmpty "redirect_uri"
+        |> parseRedirectUri "redirect_uri"
         |> Result.mapError Response.badRequest
 
     let! provider =
@@ -285,8 +305,8 @@ let completeAddAuthProvider (ctx: HttpContext) =
         // Retrieve route info
         let route = Request.getRoute ctx
         let! redirectUri =
-            ctx
-            |> Request.Route.getRedirectUri "final_redirect_uri"
+            route.TryGetStringNonEmpty "final_redirect_uri"
+            |> parseRedirectUri "final_redirect_uri"
             |> Result.mapError (fun error -> None, HttpStatusCode.BadRequest, error)
 
         let! provider =
@@ -365,7 +385,9 @@ let completeAddAuthProvider (ctx: HttpContext) =
     }
     |> TaskResult.mapError (fun (redirectUriOpt, statusCode, error) ->
         match redirectUriOpt with
-        | None -> Response.badRequest error
+        | None ->
+            Response.withStatusCode (statusCode |> int)
+            >> Response.ofPlainText error
         | Some redirectUri ->
             let finalRedirectUri = UriBuilder redirectUri
 
@@ -374,8 +396,7 @@ let completeAddAuthProvider (ctx: HttpContext) =
             query.Add("error", error)
             finalRedirectUri.Query <- query.ToString()
 
-            Response.withStatusCode (statusCode |> int)
-            >> Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri
+            Response.redirectTemporarily finalRedirectUri.Uri.AbsoluteUri
     )
 
 
